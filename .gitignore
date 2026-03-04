@@ -1,0 +1,19 @@
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+.firebaserc.local
+
+# Functions build output
+functions/lib/
+
+# Dependencies
+functions/node_modules/
+
+# Environment
+*.local
+.env
+.env.*
+
+# OS
+.DS_Store
