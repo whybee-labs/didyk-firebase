@@ -132,57 +132,48 @@ async function handleFormReply(
 
 async function getOrCreateSession(phone: string): Promise<{ user: User; session: Session }> {
   const userRef = db.collection("users").doc(phone);
-  const userSnap = await userRef.get();
 
-  let user: User;
+  return db.runTransaction(async (txn) => {
+    const userSnap = await txn.get(userRef);
+    const now = new Date();
 
-  if (userSnap.exists) {
-    user = userSnap.data() as User;
-  } else {
-    user = {
-      phone,
-      activeSessionId: null,
-      totalSessions: 0,
-      firstSeenAt: new Date(),
-      lastSeenAt: new Date(),
-    };
-    await userRef.set(user);
-  }
+    const existingUser: User | null = userSnap.exists ? (userSnap.data() as User) : null;
 
-  if (user.activeSessionId) {
-    const sessionSnap = await db.collection("conversations").doc(user.activeSessionId).get();
-    if (sessionSnap.exists) {
-      const session = sessionSnap.data() as Session;
-
-      // Resume if not completed and still within the idle window
-      if (session.status !== "completed") {
-        const lastMessageAt = (session.lastMessageAt as any)?.toDate?.() ?? new Date(0);
-        const hoursSince = (Date.now() - lastMessageAt.getTime()) / (1000 * 60 * 60);
-        if (hoursSince < IDLE_TIMEOUT_HOURS) {
-          return { user, session };
+    // Try to resume existing session
+    if (existingUser?.activeSessionId) {
+      const sessionSnap = await txn.get(
+        db.collection("conversations").doc(existingUser.activeSessionId)
+      );
+      if (sessionSnap.exists) {
+        const session = sessionSnap.data() as Session;
+        if (session.status !== "completed") {
+          const lastMessageAt = (session.lastMessageAt as any)?.toDate?.() ?? new Date(0);
+          const hoursSince = (Date.now() - lastMessageAt.getTime()) / (1000 * 60 * 60);
+          if (hoursSince < IDLE_TIMEOUT_HOURS) {
+            return { user: existingUser, session };
+          }
         }
       }
     }
-  }
 
-  // Create a new conversation
-  const sessionRef = db.collection("conversations").doc();
-  const session: Session = {
-    sessionId: sessionRef.id,
-    phone,
-    status: "discovery",
-    collectedData: {},
-    lastMessageAt: new Date(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-  await sessionRef.set(session);
+    // Create a new conversation
+    const sessionRef = db.collection("conversations").doc();
+    const session: Session = {
+      sessionId: sessionRef.id,
+      phone,
+      status: "discovery",
+      collectedData: {},
+      lastMessageAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    txn.set(sessionRef, session);
 
-  await userRef.update({
-    activeSessionId: sessionRef.id,
-    totalSessions: (user.totalSessions ?? 0) + 1,
-    lastSeenAt: new Date(),
+    const user: User = existingUser
+      ? { ...existingUser, activeSessionId: sessionRef.id, totalSessions: (existingUser.totalSessions ?? 0) + 1, lastSeenAt: now }
+      : { phone, activeSessionId: sessionRef.id, totalSessions: 1, firstSeenAt: now, lastSeenAt: now };
+    txn.set(userRef, user);
+
+    return { user, session };
   });
-
-  return { user, session };
 }
