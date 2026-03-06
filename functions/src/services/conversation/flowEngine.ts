@@ -58,7 +58,7 @@ export async function flowEngine(
       }
     }
     if (isComplete(config.fields, collectedData)) {
-      await sendConfirmation(phone, conversation);
+      await sendConfirmation(phone, { ...conversation, collectedData });
       return;
     }
   }

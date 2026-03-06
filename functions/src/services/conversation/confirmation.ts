@@ -1,5 +1,7 @@
+import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../../utils/firestore";
 import { sendButtons } from "../whatsapp/sendButtons";
+import { sendText } from "../whatsapp/sendText";
 import { getFlowConfig, UseCase } from "../../config/flows";
 import { Conversation } from "./handleIncomingMessage";
 import { startFulfillment } from "./fulfillment";
@@ -24,7 +26,10 @@ export async function handleConfirmation(
   message: { type: string; buttonId?: string },
   conversation: Conversation
 ): Promise<void> {
-  if (message.type !== "button_reply") return;
+  if (message.type !== "button_reply") {
+    await sendText(phone, "Tap one of the buttons above to continue.");
+    return;
+  }
 
   if (message.buttonId === "create") {
     await startFulfillment(phone, conversation);
@@ -41,7 +46,7 @@ export async function handleConfirmation(
 async function resetConversation(phone: string, conversation: Conversation): Promise<void> {
   await db.collection("conversations").doc(conversation.conversationId).update({
     status: "discovery",
-    useCase: null,
+    useCase: FieldValue.delete(),
     collectedData: {},
     updatedAt: new Date(),
   });
