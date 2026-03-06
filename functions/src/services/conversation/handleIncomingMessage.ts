@@ -17,8 +17,8 @@ export type ConversationStatus =
   | "completed"
   | "error";
 
-export interface Session {
-  sessionId: string;
+export interface Conversation {
+  conversationId: string; // not stored in Firestore — populated from doc ID on read
   phone: string;
   status: ConversationStatus;
   useCase?: UseCase;
@@ -30,8 +30,8 @@ export interface Session {
 
 interface User {
   phone: string;
-  activeSessionId: string | null;
-  totalSessions: number;
+  activeConversationId: string | null;
+  totalConversations: number;
   firstSeenAt: Date;
   lastSeenAt: Date;
 }
@@ -42,13 +42,13 @@ export async function handleIncomingMessage(
   phone: string,
   message: ParsedMessage
 ): Promise<void> {
-  const { session } = await getOrCreateSession(phone);
+  const { conversation } = await getOrCreateConversation(phone);
 
   logger.info("Routing message", {
     phone,
-    status: session.status,
+    status: conversation.status,
     type: message.type,
-    sessionId: session.sessionId,
+    conversationId: conversation.conversationId,
   });
 
   const now = new Date();
@@ -56,29 +56,29 @@ export async function handleIncomingMessage(
   // Update lastSeenAt on user and lastMessageAt on conversation
   await Promise.all([
     db.collection("users").doc(phone).update({ lastSeenAt: now }),
-    db.collection("conversations").doc(session.sessionId).update({ lastMessageAt: now }),
+    db.collection("conversations").doc(conversation.conversationId).update({ lastMessageAt: now }),
   ]);
 
   // Log message to subcollection (fire and forget — don't block routing)
-  db.collection("conversations").doc(session.sessionId)
+  db.collection("conversations").doc(conversation.conversationId)
     .collection("messages").add({ ...message, createdAt: now })
     .catch((err) => logger.warn("Failed to log message", { err }));
 
-  switch (session.status) {
+  switch (conversation.status) {
     case "discovery":
-      await discovery(phone, message, session);
+      await discovery(phone, message, conversation);
       break;
 
     case "form_sent":
-      await handleFormReply(phone, message, session);
+      await handleFormReply(phone, message, conversation);
       break;
 
     case "refining":
-      await flowEngine(phone, message, session);
+      await flowEngine(phone, message, conversation);
       break;
 
     case "confirming":
-      await handleConfirmation(phone, message, session);
+      await handleConfirmation(phone, message, conversation);
       break;
 
     case "generating":
@@ -90,21 +90,21 @@ export async function handleIncomingMessage(
       break;
 
     default:
-      await discovery(phone, message, session);
+      await discovery(phone, message, conversation);
   }
 }
 
 async function handleFormReply(
   phone: string,
   message: ParsedMessage,
-  session: Session
+  conversation: Conversation
 ): Promise<void> {
   if (message.type !== "form_reply" || !message.formData) {
     await sendText(phone, "Please complete the form first, then we can continue! 📋");
     return;
   }
 
-  const config = getFlowConfig(session.useCase as UseCase);
+  const config = getFlowConfig(conversation.useCase as UseCase);
   const firestoreUpdates: Record<string, unknown> = {};
   const localUpdates: Record<string, unknown> = {};
 
@@ -115,22 +115,20 @@ async function handleFormReply(
     }
   }
 
-  await db.collection("conversations").doc(session.sessionId).update({
+  await db.collection("conversations").doc(conversation.conversationId).update({
     ...firestoreUpdates,
     status: "refining",
     updatedAt: new Date(),
   });
 
-  const updatedSession: Session = {
-    ...session,
+  await flowEngine(phone, message, {
+    ...conversation,
     status: "refining",
-    collectedData: { ...session.collectedData, ...localUpdates },
-  };
-
-  await flowEngine(phone, message, updatedSession);
+    collectedData: { ...conversation.collectedData, ...localUpdates },
+  });
 }
 
-async function getOrCreateSession(phone: string): Promise<{ user: User; session: Session }> {
+async function getOrCreateConversation(phone: string): Promise<{ user: User; conversation: Conversation }> {
   const userRef = db.collection("users").doc(phone);
 
   return db.runTransaction(async (txn) => {
@@ -139,41 +137,43 @@ async function getOrCreateSession(phone: string): Promise<{ user: User; session:
 
     const existingUser: User | null = userSnap.exists ? (userSnap.data() as User) : null;
 
-    // Try to resume existing session
-    if (existingUser?.activeSessionId) {
-      const sessionSnap = await txn.get(
-        db.collection("conversations").doc(existingUser.activeSessionId)
+    // Try to resume existing conversation
+    if (existingUser?.activeConversationId) {
+      const convSnap = await txn.get(
+        db.collection("conversations").doc(existingUser.activeConversationId)
       );
-      if (sessionSnap.exists) {
-        const session = sessionSnap.data() as Session;
-        if (session.status !== "completed") {
-          const lastMessageAt = (session.lastMessageAt as any)?.toDate?.() ?? new Date(0);
+      if (convSnap.exists) {
+        const conversation: Conversation = {
+          conversationId: convSnap.id,
+          ...(convSnap.data() as Omit<Conversation, "conversationId">),
+        };
+        if (conversation.status !== "completed") {
+          const lastMessageAt = (conversation.lastMessageAt as any)?.toDate?.() ?? new Date(0);
           const hoursSince = (Date.now() - lastMessageAt.getTime()) / (1000 * 60 * 60);
           if (hoursSince < IDLE_TIMEOUT_HOURS) {
-            return { user: existingUser, session };
+            return { user: existingUser, conversation };
           }
         }
       }
     }
 
-    // Create a new conversation
-    const sessionRef = db.collection("conversations").doc();
-    const session: Session = {
-      sessionId: sessionRef.id,
+    // Create a new conversation (conversationId is the doc ID — not stored as a field)
+    const convRef = db.collection("conversations").doc();
+    const convData = {
       phone,
-      status: "discovery",
+      status: "discovery" as ConversationStatus,
       collectedData: {},
       lastMessageAt: now,
       createdAt: now,
       updatedAt: now,
     };
-    txn.set(sessionRef, session);
+    txn.set(convRef, convData);
 
     const user: User = existingUser
-      ? { ...existingUser, activeSessionId: sessionRef.id, totalSessions: (existingUser.totalSessions ?? 0) + 1, lastSeenAt: now }
-      : { phone, activeSessionId: sessionRef.id, totalSessions: 1, firstSeenAt: now, lastSeenAt: now };
+      ? { ...existingUser, activeConversationId: convRef.id, totalConversations: (existingUser.totalConversations ?? 0) + 1, lastSeenAt: now }
+      : { phone, activeConversationId: convRef.id, totalConversations: 1, firstSeenAt: now, lastSeenAt: now };
     txn.set(userRef, user);
 
-    return { user, session };
+    return { user, conversation: { conversationId: convRef.id, ...convData } };
   });
 }

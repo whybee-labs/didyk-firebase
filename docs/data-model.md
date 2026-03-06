@@ -9,22 +9,21 @@ Document ID is the user's E.164 phone number (e.g. `919876543210`).
 | Field | Type | Description |
 |-------|------|-------------|
 | `phone` | string | Same as document ID |
-| `activeSessionId` | string \| null | Points to the user's current session |
-| `totalSessions` | number | Total sessions ever started |
+| `activeConversationId` | string \| null | Points to the user's current conversation |
+| `totalConversations` | number | Total conversations ever started |
 | `firstSeenAt` | Timestamp | When the user first messaged |
 | `lastSeenAt` | Timestamp | Updated on every incoming message |
 
-A user always has at most one **active** session. A new session is created only when the current one is `completed` or has been idle for more than 8 hours.
+A user always has at most one **active** conversation. A new one is created only when the current one is `completed` or has been idle for more than 8 hours.
 
 ---
 
-## `conversations/{sessionId}`
+## `conversations/{conversationId}`
 
-Document ID is a Firestore auto-generated ID. Stored in `users/{phone}.activeSessionId`.
+Document ID is a Firestore auto-generated ID. Stored in `users/{phone}.activeConversationId`. The ID is **not** stored as a field — it is the document ID itself.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `sessionId` | string | Same as document ID |
 | `phone` | string | E.164 phone number |
 | `status` | ConversationStatus | Current state (see below) |
 | `useCase` | string \| undefined | `"birthday"` \| `"shop"` \| `"event"` |
@@ -46,7 +45,7 @@ Document ID is a Firestore auto-generated ID. Stored in `users/{phone}.activeSes
 | `completed` | Payment received |
 | `error` | Something went wrong |
 
-### `conversations/{sessionId}/messages/{messageId}` (subcollection)
+### `conversations/{conversationId}/messages/{messageId}` (subcollection)
 
 Every incoming message is appended here (fire-and-forget, does not block routing).
 
@@ -102,22 +101,22 @@ Keys depend on the use case. Examples:
 
 ---
 
-## Session Lifecycle
+## Conversation Lifecycle
 
 A new conversation document is created in two cases:
 
 ```
-User messages → getOrCreateSession()
-  ├── users/{phone} exists with activeSessionId?
-  │     └── conversations/{activeSessionId} exists?
-  │           ├── status === "completed"?      → create new session
-  │           ├── lastMessageAt > 8h ago?      → create new session
-  │           └── otherwise                   → resume existing session
+User messages → getOrCreateConversation()
+  ├── users/{phone} exists with activeConversationId?
+  │     └── conversations/{activeConversationId} exists?
+  │           ├── status === "completed"?      → create new conversation
+  │           ├── lastMessageAt > 8h ago?      → create new conversation
+  │           └── otherwise                   → resume existing conversation
   └── users/{phone} doesn't exist?
-        └── create user + new session
+        └── create user + new conversation
 ```
 
-Old sessions (`completed`) are **never deleted** — they serve as history.
+Old conversations (`completed`) are **never deleted** — they serve as history.
 
 "Start Over" during confirmation resets the **same document** back to `discovery`
 (clears `useCase` and `collectedData` — no new document created).
@@ -128,4 +127,4 @@ Old sessions (`completed`) are **never deleted** — they serve as history.
 
 No composite indexes needed currently. All queries are single-document lookups by ID.
 
-If you add analytics queries (e.g. "all completed sessions for this week"), add indexes in `firestore.indexes.json`.
+If you add analytics queries (e.g. "all completed conversations for this week"), add indexes in `firestore.indexes.json`.

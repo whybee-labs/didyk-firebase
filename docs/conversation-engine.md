@@ -4,22 +4,21 @@ The conversation engine is the core of the backend. Every incoming WhatsApp mess
 
 ---
 
-## Session Model
+## Conversation Model
 
-Each user gets one active session at a time. Sessions are stored as separate documents — users and conversations are one-to-many.
+Each user has one active conversation at a time. Users and conversations are one-to-many.
 
 **`users/{phone}`**
 ```
-phone          string   — E.164 format, also the document ID
-activeSessionId  string | null
-totalSessions  number
-firstSeenAt    Timestamp
-lastSeenAt     Timestamp
+phone                string   — E.164 format, also the document ID
+activeConversationId string | null
+totalConversations   number
+firstSeenAt          Timestamp
+lastSeenAt           Timestamp
 ```
 
-**`conversations/{sessionId}`** — Firestore auto-generated ID
+**`conversations/{conversationId}`** — Firestore auto-generated ID (not stored as a field)
 ```
-sessionId      string   — same as document ID
 phone          string
 status         ConversationStatus
 useCase        "birthday" | "shop" | "event" | undefined
@@ -29,7 +28,7 @@ createdAt      Timestamp
 updatedAt      Timestamp
 ```
 
-**`conversations/{sessionId}/messages/{messageId}`** — subcollection, appended on every message (fire-and-forget)
+**`conversations/{conversationId}/messages/{messageId}`** — subcollection, appended on every message (fire-and-forget)
 
 ---
 
@@ -74,9 +73,9 @@ updatedAt      Timestamp
 
 `handleIncomingMessage.ts` is the entry point for every message.
 
-1. **Load session** — look up `users/{phone}` → get `activeSessionId` → load `conversations/{activeSessionId}`
-2. **Create if needed** — create a new session (status `"discovery"`) if:
-   - no `activeSessionId` on the user, or
+1. **Load conversation** — look up `users/{phone}` → get `activeConversationId` → load `conversations/{activeConversationId}`
+2. **Create if needed** — create a new conversation (status `"discovery"`) if:
+   - no `activeConversationId` on the user, or
    - conversation doesn't exist, or
    - `status === "completed"`, or
    - `lastMessageAt` is more than 8 hours ago
@@ -85,7 +84,7 @@ updatedAt      Timestamp
 5. **Route by status**
 
 ```ts
-switch (session.status) {
+switch (conversation.status) {
   case "discovery":        → discovery()
   case "form_sent":        → handleFormReply()
   case "refining":         → flowEngine()
@@ -162,16 +161,16 @@ Triggered when `status === "refining"`. Called after form submission and on ever
 
 **File:** `services/conversation/confirmation.ts`
 
-**`sendConfirmation(phone, session)`**
+**`sendConfirmation(phone, conversation)`**
 - Gets flow config → calls `config.confirmationTemplate(collectedData)` to build summary
 - Sets `status: "confirming"`
 - Sends summary text + 2 buttons:
   - `✅ Create it!` (id: `"create"`)
   - `🔄 Start Over` (id: `"restart"`)
 
-**`handleConfirmation(phone, message, session)`**
+**`handleConfirmation(phone, message, conversation)`**
 - `"create"` → calls `startFulfillment()`
-- `"restart"` → resets the same conversation doc in-place: clears `useCase`, `collectedData`, sets `status: "discovery"`, calls `discovery()` on the same session
+- `"restart"` → resets the same conversation doc in-place: clears `useCase`, `collectedData`, sets `status: "discovery"`, calls `discovery()` on the same conversation
 
 ---
 
@@ -191,6 +190,6 @@ After all outputs are sent and the payment link is delivered:
 
 "Start Over" button in confirmation resets the **same conversation document** without creating a new one:
 1. Update doc: `status: "discovery"`, `useCase: null`, `collectedData: {}`
-2. Call `discovery()` on the reset session (sends welcome message)
+2. Call `discovery()` on the reset conversation (sends welcome message)
 
-There are no reset commands. Any message during an active session continues from wherever it left off.
+There are no reset commands. Any message during an active conversation continues from wherever it left off.

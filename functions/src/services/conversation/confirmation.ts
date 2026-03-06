@@ -1,14 +1,14 @@
 import { db } from "../../utils/firestore";
 import { sendButtons } from "../whatsapp/sendButtons";
 import { getFlowConfig, UseCase } from "../../config/flows";
-import { Session } from "./handleIncomingMessage";
+import { Conversation } from "./handleIncomingMessage";
 import { startFulfillment } from "./fulfillment";
 
-export async function sendConfirmation(phone: string, session: Session): Promise<void> {
-  const config = getFlowConfig(session.useCase as UseCase);
-  const summary = config.confirmationTemplate(session.collectedData);
+export async function sendConfirmation(phone: string, conversation: Conversation): Promise<void> {
+  const config = getFlowConfig(conversation.useCase as UseCase);
+  const summary = config.confirmationTemplate(conversation.collectedData);
 
-  await db.collection("conversations").doc(session.sessionId).update({
+  await db.collection("conversations").doc(conversation.conversationId).update({
     status: "confirming",
     updatedAt: new Date(),
   });
@@ -22,37 +22,35 @@ export async function sendConfirmation(phone: string, session: Session): Promise
 export async function handleConfirmation(
   phone: string,
   message: { type: string; buttonId?: string },
-  session: Session
+  conversation: Conversation
 ): Promise<void> {
   if (message.type !== "button_reply") return;
 
   if (message.buttonId === "create") {
-    await startFulfillment(phone, session);
+    await startFulfillment(phone, conversation);
     return;
   }
 
   if (message.buttonId === "restart") {
-    await resetConversation(phone, session);
+    await resetConversation(phone, conversation);
     return;
   }
 }
 
 // Reset in place — no new document, same conversation continues from discovery
-async function resetConversation(phone: string, session: Session): Promise<void> {
-  await db.collection("conversations").doc(session.sessionId).update({
+async function resetConversation(phone: string, conversation: Conversation): Promise<void> {
+  await db.collection("conversations").doc(conversation.conversationId).update({
     status: "discovery",
     useCase: null,
     collectedData: {},
     updatedAt: new Date(),
   });
 
-  const resetSession: Session = {
-    ...session,
+  const { discovery } = await import("./discovery");
+  await discovery(phone, { type: "text", phone, messageId: "", timestamp: "" }, {
+    ...conversation,
     status: "discovery",
     useCase: undefined,
     collectedData: {},
-  };
-
-  const { discovery } = await import("./discovery");
-  await discovery(phone, { type: "text", phone, messageId: "", timestamp: "" }, resetSession);
+  });
 }

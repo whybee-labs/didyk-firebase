@@ -5,16 +5,16 @@ import { sendText } from "../whatsapp/sendText";
 import { callOpenAI } from "../llm/openai";
 import { getFlowConfig, UseCase } from "../../config/flows";
 import { FlowField } from "../../config/flows/types";
-import { Session } from "./handleIncomingMessage";
+import { Conversation } from "./handleIncomingMessage";
 import { sendConfirmation } from "./confirmation";
 
 export async function flowEngine(
   phone: string,
   message: ParsedMessage,
-  session: Session
+  conversation: Conversation
 ): Promise<void> {
-  const config = getFlowConfig(session.useCase as UseCase);
-  let collectedData = { ...session.collectedData };
+  const config = getFlowConfig(conversation.useCase as UseCase);
+  let collectedData = { ...conversation.collectedData };
 
   // Handle media uploads directly — no LLM needed
   if (message.type === "image" && message.mediaId) {
@@ -24,7 +24,7 @@ export async function flowEngine(
       const updated = [...existing, message.mediaId];
       collectedData[mediaField.key] = updated;
 
-      await db.collection("conversations").doc(session.sessionId).update({
+      await db.collection("conversations").doc(conversation.conversationId).update({
         [`collectedData.${mediaField.key}`]: updated,
         updatedAt: new Date(),
       });
@@ -41,9 +41,8 @@ export async function flowEngine(
     }
 
     // Check if all fields complete after this image
-    const updatedSession = { ...session, collectedData };
-    if (isComplete(config.fields, updatedSession.collectedData)) {
-      await sendConfirmation(phone, updatedSession);
+    if (isComplete(config.fields, collectedData)) {
+      await sendConfirmation(phone, { ...conversation, collectedData });
     }
     return;
   }
@@ -59,7 +58,7 @@ export async function flowEngine(
       }
     }
     if (isComplete(config.fields, collectedData)) {
-      await sendConfirmation(phone, session);
+      await sendConfirmation(phone, conversation);
       return;
     }
   }
@@ -73,14 +72,14 @@ export async function flowEngine(
         collectedData[key] = value;
         updates[`collectedData.${key}`] = value;
       }
-      await db.collection("conversations").doc(session.sessionId).update({
+      await db.collection("conversations").doc(conversation.conversationId).update({
         ...updates,
         updatedAt: new Date(),
       });
     }
 
     if (isComplete(config.fields, collectedData)) {
-      await sendConfirmation(phone, { ...session, collectedData });
+      await sendConfirmation(phone, { ...conversation, collectedData });
       return;
     }
 

@@ -8,30 +8,30 @@ import { sendAudio } from "../whatsapp/sendAudio";
 import { getFlowConfig, UseCase } from "../../config/flows";
 import { OutputType } from "../../config/flows/types";
 import { createPaymentLink } from "../payment/createPaymentLink";
-import { Session } from "./handleIncomingMessage";
+import { Conversation } from "./handleIncomingMessage";
 
-export async function startFulfillment(phone: string, session: Session): Promise<void> {
-  logger.info("Fulfillment started", { phone, sessionId: session.sessionId, useCase: session.useCase });
+export async function startFulfillment(phone: string, conversation: Conversation): Promise<void> {
+  logger.info("Fulfillment started", { phone, conversationId: conversation.conversationId, useCase: conversation.useCase });
 
-  await db.collection("conversations").doc(session.sessionId).update({
+  await db.collection("conversations").doc(conversation.conversationId).update({
     status: "generating",
     updatedAt: new Date(),
   });
 
-  const config = getFlowConfig(session.useCase as UseCase);
+  const config = getFlowConfig(conversation.useCase as UseCase);
 
   // Generate and send all outputs defined by the flow config
   await sendText(phone, "🎬 Here's your preview!");
 
   for (const output of config.outputs) {
-    const result = await output.generate(session.collectedData);
+    const result = await output.generate(conversation.collectedData);
     await dispatchOutput(phone, output.type, result);
   }
 
   // Create Razorpay payment link and send to user
   const { id, shortUrl } = await createPaymentLink(
     phone,
-    session.sessionId,
+    conversation.conversationId,
     config.pricing.amount,
     `Whybee ${config.name}`
   );
@@ -41,7 +41,7 @@ export async function startFulfillment(phone: string, session: Session): Promise
     `💳 To receive your final files, please complete payment:\n${shortUrl}`
   );
 
-  await db.collection("conversations").doc(session.sessionId).update({
+  await db.collection("conversations").doc(conversation.conversationId).update({
     status: "awaiting_payment",
     "collectedData.paymentLinkId": id,
     updatedAt: new Date(),

@@ -6,7 +6,7 @@ import { sendText } from "../whatsapp/sendText";
 import { sendFlow } from "../whatsapp/sendFlow";
 import { callOpenAI } from "../llm/openai";
 import { getFlowConfig, UseCase } from "../../config/flows";
-import { Session } from "./handleIncomingMessage";
+import { Conversation } from "./handleIncomingMessage";
 
 const WELCOME_MESSAGE =
   "👋 Welcome to *Whybee*! I can create personalised videos for you.\n\nWhat would you like to make today?";
@@ -14,20 +14,20 @@ const WELCOME_MESSAGE =
 export async function discovery(
   phone: string,
   message: ParsedMessage,
-  session: Session
+  conversation: Conversation
 ): Promise<void> {
   // Button tap — direct intent, no LLM needed
   if (message.type === "button_reply") {
     const useCase = message.buttonId as UseCase;
     if (useCase === "birthday" || useCase === "shop" || useCase === "event") {
-      await initiateFlow(phone, session.sessionId, useCase);
+      await initiateFlow(phone, conversation.conversationId, useCase);
       return;
     }
   }
 
   // First contact or any text — send welcome + buttons
-  if (!session.collectedData.welcomeSent) {
-    await db.collection("conversations").doc(session.sessionId).update({
+  if (!conversation.collectedData.welcomeSent) {
+    await db.collection("conversations").doc(conversation.conversationId).update({
       "collectedData.welcomeSent": true,
       updatedAt: new Date(),
     });
@@ -43,7 +43,7 @@ export async function discovery(
   if (message.type === "text" && message.text) {
     const detected = await detectIntent(message.text);
     if (detected) {
-      await initiateFlow(phone, session.sessionId, detected);
+      await initiateFlow(phone, conversation.conversationId, detected);
       return;
     }
   }
@@ -60,10 +60,10 @@ export async function discovery(
   );
 }
 
-async function initiateFlow(phone: string, sessionId: string, useCase: UseCase): Promise<void> {
+async function initiateFlow(phone: string, conversationId: string, useCase: UseCase): Promise<void> {
   const config = getFlowConfig(useCase);
 
-  await db.collection("conversations").doc(sessionId).update({
+  await db.collection("conversations").doc(conversationId).update({
     useCase,
     status: "form_sent",
     updatedAt: new Date(),

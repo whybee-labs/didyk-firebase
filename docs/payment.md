@@ -4,7 +4,7 @@
 
 ## Overview
 
-After all outputs are delivered (preview video, image, etc.), the user receives a Razorpay payment link. When the user pays, Razorpay calls our webhook, which marks the session complete and sends a confirmation message.
+After all outputs are delivered (preview video, image, etc.), the user receives a Razorpay payment link. When the user pays, Razorpay calls our webhook, which marks the conversation complete and sends a confirmation message.
 
 ```
 Fulfillment → createPaymentLink() → send link to user → status: "awaiting_payment"
@@ -13,7 +13,7 @@ Fulfillment → createPaymentLink() → send link to user → status: "awaiting_
                                                                ↓
                                          POST /razorpayWebhook
                                          verify signature
-                                         look up session by reference_id
+                                         look up conversation by reference_id
                                          status: "completed"
                                          send "✅ Payment received!" to user
 ```
@@ -25,13 +25,13 @@ Fulfillment → createPaymentLink() → send link to user → status: "awaiting_
 **File:** `services/payment/createPaymentLink.ts`
 
 ```ts
-createPaymentLink(phone, sessionId, amount, description)
+createPaymentLink(phone, conversationId, amount, description)
   → { id: string, shortUrl: string }
 ```
 
 - Calls `POST https://api.razorpay.com/v1/payment_link` with Basic Auth (`key_id:key_secret`)
 - `amount` is in **INR** — converted to paise (× 100) internally
-- `reference_id` is set to `sessionId` so the webhook can look up the session without a secondary index
+- `reference_id` is set to `conversationId` so the webhook can look up the conversation without a secondary index
 - `notify: { sms: false, email: false }` — Whybee sends the link manually via WhatsApp
 - Returns `{ id, shortUrl }` — `shortUrl` is sent to the user, `id` is stored in `collectedData.paymentLinkId`
 
@@ -75,8 +75,8 @@ req.body.payload.payment_link.entity.reference_id
 ```
 
 Steps:
-1. Extract `reference_id` (= `sessionId`)
-2. Load `conversations/{sessionId}` → get `phone`
+1. Extract `reference_id` (= `conversationId`)
+2. Load `conversations/{conversationId}` → get `phone`
 3. Update `status: "completed"`
 4. Send `"✅ Payment received! Your video will be delivered shortly."` via WhatsApp
 
@@ -104,25 +104,18 @@ Get these from the Razorpay dashboard:
 
 ---
 
-## Testing the Webhook Locally
+## Testing the Webhook
 
 ```bash
-curl -X POST https://YOUR_FUNCTION_URL/razorpayWebhook \
+CONV_ID="<conversationId from Firestore>"
+SECRET=$(firebase functions:secrets:access RAZORPAY_WEBHOOK_SECRET --project=<project-id>)
+
+PAYLOAD="{\"event\":\"payment_link.paid\",\"payload\":{\"payment_link\":{\"entity\":{\"reference_id\":\"${CONV_ID}\"}}}}"
+
+SIG=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')
+
+curl -X POST https://YOUR_FUNCTION_URL \
   -H "Content-Type: application/json" \
-  -H "X-Razorpay-Signature: COMPUTED_HMAC" \
-  -d '{
-    "event": "payment_link.paid",
-    "payload": {
-      "payment_link": {
-        "entity": {
-          "reference_id": "YOUR_SESSION_ID"
-        }
-      }
-    }
-  }'
-```
-
-Compute the HMAC with:
-```bash
-echo -n '{"event":"payment_link.paid",...}' | openssl dgst -sha256 -hmac "YOUR_WEBHOOK_SECRET"
+  -H "x-razorpay-signature: $SIG" \
+  -d "$PAYLOAD"
 ```

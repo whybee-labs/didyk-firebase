@@ -9,13 +9,13 @@ After the user confirms their order, `startFulfillment()` generates all outputs 
 `services/conversation/fulfillment.ts`
 
 ```
-startFulfillment(phone, session)
+startFulfillment(phone, conversation)
   │
   ├── set status: "generating"
   ├── send "🎬 Here's your preview!"
   │
   ├── for each output in config.outputs:
-  │     result = await output.generate(session.collectedData)
+  │     result = await output.generate(conversation.collectedData)
   │     await dispatchOutput(phone, output.type, result)
   │
   ├── createPaymentLink(...)
@@ -54,7 +54,7 @@ Each generator is a function:
 | `generateAudio` | `audioGenerator.ts` | W3C sample MP3 |
 | `generateText` | `textGenerator.ts` | OpenAI `gpt-4.1-nano` generates personalized message |
 
-The `data` argument is `session.collectedData` — it contains all fields collected during the conversation (text fields from the form + media IDs from the LLM phase).
+The `data` argument is `conversation.collectedData` — it contains all fields collected during the conversation (text fields from the form + media IDs from the LLM phase).
 
 ---
 

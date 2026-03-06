@@ -3,7 +3,7 @@ import { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET } from "../../config/env";
 
 export async function createPaymentLink(
   phone: string,
-  sessionId: string,
+  conversationId: string,
   amount: number, // in INR
   description: string
 ): Promise<{ id: string; shortUrl: string }> {
@@ -18,7 +18,7 @@ export async function createPaymentLink(
       currency: "INR",
       description,
       customer: { contact: phone },
-      reference_id: sessionId,
+      reference_id: conversationId,
       notify: { sms: false, email: false },
       reminder_enable: false,
     },

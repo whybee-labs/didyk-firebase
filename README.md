@@ -9,7 +9,7 @@ Users chat with a WhatsApp bot → describe what they want → receive a preview
 ## Tech Stack
 
 - **Firebase Functions v2** — Node.js + TypeScript
-- **Firestore** — session and user state
+- **Firestore** — conversation and user state
 - **WhatsApp Cloud API** — messaging + forms
 - **OpenAI gpt-4.1-nano** — intent detection + field extraction + text generation
 - **Razorpay** — payment links + webhook
@@ -24,7 +24,7 @@ User sends WhatsApp message
          ↓
    parseWebhookPayload
          ↓
-   handleIncomingMessage  ← routes by session status
+   handleIncomingMessage  ← routes by conversation status
          ↓
    discovery              → intent detection (buttons or LLM)
          ↓
@@ -136,7 +136,7 @@ firebase deploy --only functions
 
 | Doc | What it covers |
 |-----|---------------|
-| [docs/conversation-engine.md](docs/conversation-engine.md) | Session model, status machine, routing, all 5 pipeline phases |
+| [docs/conversation-engine.md](docs/conversation-engine.md) | Conversation model, status machine, routing, all 5 pipeline phases |
 | [docs/flows.md](docs/flows.md) | FlowConfig schema, fields, outputs, how to add a new flow |
 | [docs/media-generation.md](docs/media-generation.md) | Generators, OutputType, WhatsApp senders, replacing stubs |
 | [docs/payment.md](docs/payment.md) | Razorpay: createPaymentLink, webhook, signature verification |
