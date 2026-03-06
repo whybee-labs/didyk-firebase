@@ -24,9 +24,12 @@ phone          string
 status         ConversationStatus
 useCase        "birthday" | "shop" | "event" | undefined
 collectedData  Record<string, unknown>   — all collected fields + paymentLinkId
+lastMessageAt  Timestamp  — updated on every incoming message (used for idle timeout)
 createdAt      Timestamp
 updatedAt      Timestamp
 ```
+
+**`conversations/{sessionId}/messages/{messageId}`** — subcollection, appended on every message (fire-and-forget)
 
 ---
 
@@ -34,7 +37,7 @@ updatedAt      Timestamp
 
 ```
             ┌──────────────┐
-  new user  │   discovery  │ ← reset commands always land here
+  new user  │   discovery  │
             └──────┬───────┘
                    │ button tap or LLM detects intent
             ┌──────▼───────┐
@@ -61,7 +64,8 @@ updatedAt      Timestamp
             │  completed   │
             └──────────────┘
 
-"Start Over" at confirming → cancelled → new discovery session
+"Start Over" at confirming → resets the same conversation doc back to discovery
+(status, useCase, collectedData cleared — no new document created)
 ```
 
 ---
@@ -71,9 +75,13 @@ updatedAt      Timestamp
 `handleIncomingMessage.ts` is the entry point for every message.
 
 1. **Load session** — look up `users/{phone}` → get `activeSessionId` → load `conversations/{activeSessionId}`
-2. **Create if missing** — if no active session (or session is cancelled/completed), create a new one with status `"discovery"`
-3. **Update lastSeenAt** on the user
-4. **Check reset commands** — `"hi"`, `"hello"`, `"menu"`, `"restart"`, `"start"` always cancel the current session and start a fresh discovery
+2. **Create if needed** — create a new session (status `"discovery"`) if:
+   - no `activeSessionId` on the user, or
+   - conversation doesn't exist, or
+   - `status === "completed"`, or
+   - `lastMessageAt` is more than 8 hours ago
+3. **Update timestamps** — `lastSeenAt` on user + `lastMessageAt` on conversation (parallel)
+4. **Log message** — append to `conversations/{id}/messages/` subcollection (fire-and-forget)
 5. **Route by status**
 
 ```ts
@@ -83,8 +91,7 @@ switch (session.status) {
   case "refining":         → flowEngine()
   case "confirming":       → handleConfirmation()
   case "generating":       → "Still generating, hang tight!"
-  case "awaiting_payment": → "Please use the payment link above."
-  case "completed":        → "Type 'hi' to create another one."
+  case "awaiting_payment": → "Please complete your payment using the link sent above."
 }
 ```
 
@@ -164,7 +171,7 @@ Triggered when `status === "refining"`. Called after form submission and on ever
 
 **`handleConfirmation(phone, message, session)`**
 - `"create"` → calls `startFulfillment()`
-- `"restart"` → cancels session, creates new one, calls `discovery()` on it
+- `"restart"` → resets the same conversation doc in-place: clears `useCase`, `collectedData`, sets `status: "discovery"`, calls `discovery()` on the same session
 
 ---
 
@@ -180,12 +187,10 @@ After all outputs are sent and the payment link is delivered:
 
 ---
 
-## Reset Flow
+## Start Over
 
-Reset commands (`hi`, `hello`, `menu`, `restart`, `start`) at any status:
-1. Set current session's `status: "cancelled"`
-2. Create a new `conversations` document with `status: "discovery"`
-3. Update `users/{phone}.activeSessionId` → new session ID
-4. Call `discovery()` on the new session (sends welcome message)
+"Start Over" button in confirmation resets the **same conversation document** without creating a new one:
+1. Update doc: `status: "discovery"`, `useCase: null`, `collectedData: {}`
+2. Call `discovery()` on the reset session (sends welcome message)
 
-"Start Over" button in confirmation does the same thing.
+There are no reset commands. Any message during an active session continues from wherever it left off.

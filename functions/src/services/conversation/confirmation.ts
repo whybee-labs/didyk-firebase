@@ -32,37 +32,27 @@ export async function handleConfirmation(
   }
 
   if (message.buttonId === "restart") {
-    await resetSession(phone, session.sessionId);
+    await resetConversation(phone, session);
     return;
   }
 }
 
-async function resetSession(phone: string, sessionId: string): Promise<void> {
-  // Mark current session as cancelled
-  await db.collection("conversations").doc(sessionId).update({
-    status: "cancelled",
-    updatedAt: new Date(),
-  });
-
-  // Create a fresh session
-  const newSessionRef = db.collection("conversations").doc();
-  const newSession: Session = {
-    sessionId: newSessionRef.id,
-    phone,
+// Reset in place — no new document, same conversation continues from discovery
+async function resetConversation(phone: string, session: Session): Promise<void> {
+  await db.collection("conversations").doc(session.sessionId).update({
     status: "discovery",
+    useCase: null,
     collectedData: {},
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-  await newSessionRef.set(newSession);
-
-  // Point user to new session
-  await db.collection("users").doc(phone).update({
-    activeSessionId: newSessionRef.id,
     updatedAt: new Date(),
   });
 
-  // Trigger discovery on the new session (imported lazily to avoid circular dep)
+  const resetSession: Session = {
+    ...session,
+    status: "discovery",
+    useCase: undefined,
+    collectedData: {},
+  };
+
   const { discovery } = await import("./discovery");
-  await discovery(phone, { type: "text", phone, messageId: "", timestamp: "" }, newSession);
+  await discovery(phone, { type: "text", phone, messageId: "", timestamp: "" }, resetSession);
 }

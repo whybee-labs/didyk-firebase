@@ -15,7 +15,6 @@ export type ConversationStatus =
   | "generating"
   | "awaiting_payment"
   | "completed"
-  | "cancelled"
   | "error";
 
 export interface Session {
@@ -24,6 +23,7 @@ export interface Session {
   status: ConversationStatus;
   useCase?: UseCase;
   collectedData: Record<string, unknown>;
+  lastMessageAt: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,7 +36,7 @@ interface User {
   lastSeenAt: Date;
 }
 
-const RESET_COMMANDS = new Set(["hi", "hello", "menu", "restart", "start"]);
+const IDLE_TIMEOUT_HOURS = 8;
 
 export async function handleIncomingMessage(
   phone: string,
@@ -51,13 +51,18 @@ export async function handleIncomingMessage(
     sessionId: session.sessionId,
   });
 
-  await db.collection("users").doc(phone).update({ lastSeenAt: new Date() });
+  const now = new Date();
 
-  // Reset command — cancel current session and start fresh
-  if (message.type === "text" && RESET_COMMANDS.has(message.text?.toLowerCase().trim() ?? "")) {
-    await resetToNewSession(phone, session);
-    return;
-  }
+  // Update lastSeenAt on user and lastMessageAt on conversation
+  await Promise.all([
+    db.collection("users").doc(phone).update({ lastSeenAt: now }),
+    db.collection("conversations").doc(session.sessionId).update({ lastMessageAt: now }),
+  ]);
+
+  // Log message to subcollection (fire and forget — don't block routing)
+  db.collection("conversations").doc(session.sessionId)
+    .collection("messages").add({ ...message, createdAt: now })
+    .catch((err) => logger.warn("Failed to log message", { err }));
 
   switch (session.status) {
     case "discovery":
@@ -77,15 +82,11 @@ export async function handleIncomingMessage(
       break;
 
     case "generating":
-      await sendText(phone, "⏳ Still generating your video, hang tight!");
+      await sendText(phone, "⏳ Still working on it, hang tight!");
       break;
 
     case "awaiting_payment":
       await sendText(phone, "💳 Please complete your payment using the link sent above.");
-      break;
-
-    case "completed":
-      await sendText(phone, "✅ Your video was delivered! Type *hi* to create another one.");
       break;
 
     default:
@@ -152,19 +153,26 @@ async function getOrCreateSession(phone: string): Promise<{ user: User; session:
     const sessionSnap = await db.collection("conversations").doc(user.activeSessionId).get();
     if (sessionSnap.exists) {
       const session = sessionSnap.data() as Session;
-      if (session.status !== "cancelled" && session.status !== "completed") {
-        return { user, session };
+
+      // Resume if not completed and still within the idle window
+      if (session.status !== "completed") {
+        const lastMessageAt = (session.lastMessageAt as any)?.toDate?.() ?? new Date(0);
+        const hoursSince = (Date.now() - lastMessageAt.getTime()) / (1000 * 60 * 60);
+        if (hoursSince < IDLE_TIMEOUT_HOURS) {
+          return { user, session };
+        }
       }
     }
   }
 
-  // Create a new session
+  // Create a new conversation
   const sessionRef = db.collection("conversations").doc();
   const session: Session = {
     sessionId: sessionRef.id,
     phone,
     status: "discovery",
     collectedData: {},
+    lastMessageAt: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -177,29 +185,4 @@ async function getOrCreateSession(phone: string): Promise<{ user: User; session:
   });
 
   return { user, session };
-}
-
-async function resetToNewSession(phone: string, currentSession: Session): Promise<void> {
-  await db.collection("conversations").doc(currentSession.sessionId).update({
-    status: "cancelled",
-    updatedAt: new Date(),
-  });
-
-  const sessionRef = db.collection("conversations").doc();
-  const newSession: Session = {
-    sessionId: sessionRef.id,
-    phone,
-    status: "discovery",
-    collectedData: {},
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-  await sessionRef.set(newSession);
-
-  await db.collection("users").doc(phone).update({
-    activeSessionId: sessionRef.id,
-    lastSeenAt: new Date(),
-  });
-
-  await discovery(phone, { type: "text", phone, messageId: "", timestamp: "" }, newSession);
 }

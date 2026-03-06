@@ -10,11 +10,11 @@ Document ID is the user's E.164 phone number (e.g. `919876543210`).
 |-------|------|-------------|
 | `phone` | string | Same as document ID |
 | `activeSessionId` | string \| null | Points to the user's current session |
-| `totalSessions` | number | Total sessions ever started (including cancelled) |
+| `totalSessions` | number | Total sessions ever started |
 | `firstSeenAt` | Timestamp | When the user first messaged |
 | `lastSeenAt` | Timestamp | Updated on every incoming message |
 
-A user always has at most one **active** session. When a session completes or is cancelled, `activeSessionId` stays pointing to it until the user starts a new one (which creates a new session doc and updates this field).
+A user always has at most one **active** session. A new session is created only when the current one is `completed` or has been idle for more than 8 hours.
 
 ---
 
@@ -29,6 +29,7 @@ Document ID is a Firestore auto-generated ID. Stored in `users/{phone}.activeSes
 | `status` | ConversationStatus | Current state (see below) |
 | `useCase` | string \| undefined | `"birthday"` \| `"shop"` \| `"event"` |
 | `collectedData` | object | All fields collected during the conversation |
+| `lastMessageAt` | Timestamp | Updated on every incoming message (used for idle timeout) |
 | `createdAt` | Timestamp | |
 | `updatedAt` | Timestamp | Updated on every status change |
 
@@ -43,8 +44,23 @@ Document ID is a Firestore auto-generated ID. Stored in `users/{phone}.activeSes
 | `generating` | Outputs being generated |
 | `awaiting_payment` | Payment link sent, waiting for payment |
 | `completed` | Payment received |
-| `cancelled` | User started over or reset |
 | `error` | Something went wrong |
+
+### `conversations/{sessionId}/messages/{messageId}` (subcollection)
+
+Every incoming message is appended here (fire-and-forget, does not block routing).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `phone` | string | Sender's E.164 number |
+| `messageId` | string | WhatsApp message ID |
+| `timestamp` | string | WhatsApp-provided timestamp |
+| `type` | string | `text`, `image`, `button_reply`, `form_reply`, etc. |
+| `text` | string? | Present for text messages |
+| `mediaId` | string? | Present for image/video/audio |
+| `buttonId` | string? | Present for button replies |
+| `formData` | object? | Present for form replies |
+| `createdAt` | Timestamp | When this record was written |
 
 ### `collectedData` structure
 
@@ -88,17 +104,23 @@ Keys depend on the use case. Examples:
 
 ## Session Lifecycle
 
+A new conversation document is created in two cases:
+
 ```
 User messages → getOrCreateSession()
   ├── users/{phone} exists with activeSessionId?
-  │     └── conversations/{activeSessionId} exists and not cancelled/completed?
-  │           └── YES → use existing session
-  │           └── NO  → create new session, update activeSessionId
+  │     └── conversations/{activeSessionId} exists?
+  │           ├── status === "completed"?      → create new session
+  │           ├── lastMessageAt > 8h ago?      → create new session
+  │           └── otherwise                   → resume existing session
   └── users/{phone} doesn't exist?
-        └── create user + session
+        └── create user + new session
 ```
 
-Old sessions (cancelled/completed) are **never deleted** — they serve as a history.
+Old sessions (`completed`) are **never deleted** — they serve as history.
+
+"Start Over" during confirmation resets the **same document** back to `discovery`
+(clears `useCase` and `collectedData` — no new document created).
 
 ---
 
