@@ -1,12 +1,17 @@
 import { onRequest, Request } from "firebase-functions/v2/https";
-import { defineSecret } from "firebase-functions/params";
 import { logger } from "firebase-functions";
 import { Response } from "express";
-
-const verifyToken = defineSecret("WHATSAPP_VERIFY_TOKEN");
+import {
+  WHATSAPP_VERIFY_TOKEN,
+  WHATSAPP_ACCESS_TOKEN,
+  WHATSAPP_PHONE_NUMBER_ID,
+  OPENAI_API_KEY,
+} from "../config/env";
+import { parseWebhookPayload } from "../services/whatsapp/parseWebhookPayload";
+import { handleIncomingMessage } from "../services/conversation/handleIncomingMessage";
 
 export const whatsappWebhook = onRequest(
-  { secrets: [verifyToken] },
+  { secrets: [WHATSAPP_VERIFY_TOKEN, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, OPENAI_API_KEY] },
   async (req, res) => {
     if (req.method === "GET") {
       handleVerification(req, res);
@@ -14,7 +19,7 @@ export const whatsappWebhook = onRequest(
     }
 
     if (req.method === "POST") {
-      handleIncomingMessage(req, res);
+      await handleIncoming(req, res);
       return;
     }
 
@@ -27,7 +32,7 @@ function handleVerification(req: Request, res: Response): void {
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
 
-  if (mode === "subscribe" && token === verifyToken.value()) {
+  if (mode === "subscribe" && token === WHATSAPP_VERIFY_TOKEN.value()) {
     logger.info("WhatsApp webhook verified successfully");
     res.status(200).send(challenge);
     return;
@@ -37,33 +42,18 @@ function handleVerification(req: Request, res: Response): void {
   res.status(403).send("Forbidden");
 }
 
-function handleIncomingMessage(req: Request, res: Response): void {
+async function handleIncoming(req: Request, res: Response): Promise<void> {
   // Respond 200 immediately so Meta doesn't retry
   res.status(200).send("OK");
 
-  const body = req.body as WhatsAppPayload;
-  logger.info("Incoming WhatsApp event", { payload: body });
+  const parsed = parseWebhookPayload(req.body);
+  if (!parsed) return;
 
-  const message = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-  if (!message) return;
+  logger.info("Incoming WhatsApp message", { parsed });
 
-  const sender = message.from;
-  const text = message.text?.body;
-
-  logger.info("Incoming WhatsApp message", { sender, text });
-}
-
-// Minimal types for the Meta webhook payload
-interface WhatsAppPayload {
-  object: string;
-  entry?: Array<{
-    changes?: Array<{
-      value?: {
-        messages?: Array<{
-          from: string;
-          text?: { body: string };
-        }>;
-      };
-    }>;
-  }>;
+  try {
+    await handleIncomingMessage(parsed.phone, parsed);
+  } catch (err) {
+    logger.error("Error handling incoming message", { err });
+  }
 }

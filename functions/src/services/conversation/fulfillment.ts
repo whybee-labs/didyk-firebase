@@ -1,0 +1,64 @@
+import { logger } from "firebase-functions";
+import { db } from "../../utils/firestore";
+import { sendText } from "../whatsapp/sendText";
+import { sendVideo } from "../whatsapp/sendVideo";
+import { sendImage } from "../whatsapp/sendImage";
+import { sendDocument } from "../whatsapp/sendDocument";
+import { sendAudio } from "../whatsapp/sendAudio";
+import { getFlowConfig, UseCase } from "../../config/flows";
+import { OutputType } from "../../config/flows/types";
+import { createPaymentLink } from "../payment/createPaymentLink";
+import { Session } from "./handleIncomingMessage";
+
+export async function startFulfillment(phone: string, session: Session): Promise<void> {
+  logger.info("Fulfillment started", { phone, sessionId: session.sessionId, useCase: session.useCase });
+
+  await db.collection("conversations").doc(session.sessionId).update({
+    status: "generating",
+    updatedAt: new Date(),
+  });
+
+  const config = getFlowConfig(session.useCase as UseCase);
+
+  // Generate and send all outputs defined by the flow config
+  await sendText(phone, "🎬 Here's your preview!");
+
+  for (const output of config.outputs) {
+    const result = await output.generate(session.collectedData);
+    await dispatchOutput(phone, output.type, result);
+  }
+
+  // Create Razorpay payment link and send to user
+  const { id, shortUrl } = await createPaymentLink(
+    phone,
+    session.sessionId,
+    config.pricing.amount,
+    `Whybee ${config.name}`
+  );
+
+  await sendText(
+    phone,
+    `💳 To receive your final files, please complete payment:\n${shortUrl}`
+  );
+
+  await db.collection("conversations").doc(session.sessionId).update({
+    status: "awaiting_payment",
+    "collectedData.paymentLinkId": id,
+    updatedAt: new Date(),
+  });
+}
+
+async function dispatchOutput(phone: string, type: OutputType, value: string): Promise<void> {
+  switch (type) {
+    case "video":
+      return sendVideo(phone, value);
+    case "image":
+      return sendImage(phone, value);
+    case "pdf":
+      return sendDocument(phone, value, "whybee.pdf");
+    case "audio":
+      return sendAudio(phone, value);
+    case "text":
+      return sendText(phone, value);
+  }
+}

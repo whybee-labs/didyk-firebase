@@ -1,0 +1,161 @@
+import { logger } from "firebase-functions";
+import { db } from "../../utils/firestore";
+import { ParsedMessage } from "../whatsapp/parseWebhookPayload";
+import { sendText } from "../whatsapp/sendText";
+import { callOpenAI } from "../llm/openai";
+import { getFlowConfig, UseCase } from "../../config/flows";
+import { FlowField } from "../../config/flows/types";
+import { Session } from "./handleIncomingMessage";
+import { sendConfirmation } from "./confirmation";
+
+export async function flowEngine(
+  phone: string,
+  message: ParsedMessage,
+  session: Session
+): Promise<void> {
+  const config = getFlowConfig(session.useCase as UseCase);
+  let collectedData = { ...session.collectedData };
+
+  // Handle media uploads directly — no LLM needed
+  if (message.type === "image" && message.mediaId) {
+    const mediaField = config.fields.find((f) => f.type === "media");
+    if (mediaField) {
+      const existing = (collectedData[mediaField.key] as string[] | undefined) ?? [];
+      const updated = [...existing, message.mediaId];
+      collectedData[mediaField.key] = updated;
+
+      await db.collection("conversations").doc(session.sessionId).update({
+        [`collectedData.${mediaField.key}`]: updated,
+        updatedAt: new Date(),
+      });
+
+      const maxImages = 3;
+      if (updated.length < maxImages) {
+        await sendText(
+          phone,
+          `Got it! (${updated.length}/${maxImages}) Send more photos or type *done* when ready.`
+        );
+      } else {
+        await sendText(phone, "Perfect, that's all the photos we need!");
+      }
+    }
+
+    // Check if all fields complete after this image
+    const updatedSession = { ...session, collectedData };
+    if (isComplete(config.fields, updatedSession.collectedData)) {
+      await sendConfirmation(phone, updatedSession);
+    }
+    return;
+  }
+
+  // "done" with images
+  if (message.type === "text" && message.text?.toLowerCase().trim() === "done") {
+    const mediaField = config.fields.find((f) => f.type === "media");
+    if (mediaField) {
+      const images = (collectedData[mediaField.key] as string[] | undefined) ?? [];
+      if (mediaField.required && images.length === 0) {
+        await sendText(phone, "Please send at least one photo first.");
+        return;
+      }
+    }
+    if (isComplete(config.fields, collectedData)) {
+      await sendConfirmation(phone, session);
+      return;
+    }
+  }
+
+  // LLM extracts any remaining text fields from the message
+  if (message.type === "text" && message.text) {
+    const result = await extractWithLLM(config.fields, collectedData, message.text, config.name);
+    if (result.extractedFields && Object.keys(result.extractedFields).length > 0) {
+      const updates: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(result.extractedFields)) {
+        collectedData[key] = value;
+        updates[`collectedData.${key}`] = value;
+      }
+      await db.collection("conversations").doc(session.sessionId).update({
+        ...updates,
+        updatedAt: new Date(),
+      });
+    }
+
+    if (isComplete(config.fields, collectedData)) {
+      await sendConfirmation(phone, { ...session, collectedData });
+      return;
+    }
+
+    if (result.nextQuestion) {
+      await sendText(phone, result.nextQuestion);
+    }
+    return;
+  }
+
+  // Fallback — ask for next missing field
+  const nextField = getNextMissingField(config.fields, collectedData);
+  if (nextField) {
+    await sendText(phone, `Please share: ${nextField.label}`);
+  }
+}
+
+function isComplete(fields: FlowField[], data: Record<string, unknown>): boolean {
+  return fields.every((f) => {
+    if (!f.required) return true;
+    if (f.type === "media") {
+      const arr = data[f.key] as string[] | undefined;
+      return Array.isArray(arr) && arr.length > 0;
+    }
+    return !!data[f.key];
+  });
+}
+
+function getNextMissingField(fields: FlowField[], data: Record<string, unknown>): FlowField | null {
+  return (
+    fields.find((f) => {
+      if (!f.required) return false;
+      if (f.type === "media") {
+        const arr = data[f.key] as string[] | undefined;
+        return !Array.isArray(arr) || arr.length === 0;
+      }
+      return !data[f.key];
+    }) ?? null
+  );
+}
+
+interface LLMResult {
+  extractedFields: Record<string, unknown>;
+  nextQuestion: string;
+  isComplete: boolean;
+}
+
+async function extractWithLLM(
+  fields: FlowField[],
+  collectedData: Record<string, unknown>,
+  userMessage: string,
+  flowName: string
+): Promise<LLMResult> {
+  const fieldSummary = fields
+    .filter((f) => f.type === "text")
+    .map((f) => {
+      const val = collectedData[f.key];
+      return `- ${f.key} (${f.label}): ${val ?? "NOT FILLED"}`;
+    })
+    .join("\n");
+
+  const system = `You are collecting information to create a ${flowName} video on WhatsApp.
+Current field state:
+${fieldSummary}
+
+From the user's message, extract any field values present.
+Then determine the next question to ask for the next missing required field.
+Respond in JSON: { "extractedFields": { "fieldKey": "value" }, "nextQuestion": "...", "isComplete": false }
+isComplete = true only when all text fields above are filled (ignore media fields, those are handled separately).`;
+
+  try {
+    const raw = await callOpenAI(system, userMessage);
+    const result = JSON.parse(raw) as LLMResult;
+    return result;
+  } catch (err) {
+    logger.warn("LLM extraction failed", { err });
+    return { extractedFields: {}, nextQuestion: "", isComplete: false };
+  }
+}
