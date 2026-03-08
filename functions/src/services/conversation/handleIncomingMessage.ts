@@ -1,4 +1,5 @@
 import { logger } from "firebase-functions";
+import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../../utils/firestore";
 import { ParsedMessage } from "../whatsapp/parseWebhookPayload";
 import { sendText } from "../whatsapp/sendText";
@@ -42,7 +43,18 @@ export async function handleIncomingMessage(
   phone: string,
   message: ParsedMessage
 ): Promise<void> {
-  const { conversation } = await getOrCreateConversation(phone);
+  let { conversation } = await getOrCreateConversation(phone);
+
+  // "hi" resets conversation to discovery from any state (useful for testing)
+  if (message.type === "text" && message.text?.toLowerCase().trim() === "hi") {
+    await db.collection("conversations").doc(conversation.conversationId).update({
+      status: "discovery",
+      useCase: FieldValue.delete(),
+      collectedData: {},
+      updatedAt: new Date(),
+    });
+    conversation = { ...conversation, status: "discovery", useCase: undefined, collectedData: {} };
+  }
 
   logger.info("Routing message", {
     phone,

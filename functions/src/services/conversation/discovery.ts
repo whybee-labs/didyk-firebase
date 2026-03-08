@@ -3,10 +3,18 @@ import { db } from "../../utils/firestore";
 import { ParsedMessage } from "../whatsapp/parseWebhookPayload";
 import { sendButtons } from "../whatsapp/sendButtons";
 import { sendText } from "../whatsapp/sendText";
-import { sendFlow } from "../whatsapp/sendFlow";
+import { sendVideo } from "../whatsapp/sendVideo";
+import { sendImage } from "../whatsapp/sendImage";
+import { sendAudio } from "../whatsapp/sendAudio";
+import { sendDocument } from "../whatsapp/sendDocument";
 import { callOpenAI } from "../llm/openai";
-import { getFlowConfig, UseCase } from "../../config/flows";
+import { UseCase } from "../../config/flows";
 import { Conversation } from "./handleIncomingMessage";
+import { generateVideo } from "../generators/videoGenerator";
+import { generateImage } from "../generators/imageGenerator";
+import { generateAudio } from "../generators/audioGenerator";
+import { generatePdf } from "../generators/pdfGenerator";
+import { generateText } from "../generators/textGenerator";
 
 const WELCOME_MESSAGE =
   "👋 Welcome to *Whybee*! I can create personalised videos for you.\n\nWhat would you like to make today?";
@@ -18,14 +26,42 @@ export async function discovery(
 ): Promise<void> {
   // Button tap — direct intent, no LLM needed
   if (message.type === "button_reply") {
-    const useCase = message.buttonId as UseCase;
-    if (useCase === "birthday" || useCase === "shop" || useCase === "event") {
-      await initiateFlow(phone, conversation.conversationId, useCase);
+    const buttonId = message.buttonId;
+
+    if (buttonId === "birthday" || buttonId === "shop" || buttonId === "event") {
+      await initiateFlow(phone, conversation.conversationId, buttonId as UseCase);
+      return;
+    }
+
+    // Test media buttons — run stub generators and send the result
+    if (buttonId === "test-video") {
+      const url = await generateVideo({});
+      await sendVideo(phone, url);
+      return;
+    }
+    if (buttonId === "test-image") {
+      const url = await generateImage({});
+      await sendImage(phone, url);
+      return;
+    }
+    if (buttonId === "test-audio") {
+      const url = await generateAudio({});
+      await sendAudio(phone, url);
+      return;
+    }
+    if (buttonId === "test-pdf") {
+      const url = await generatePdf({});
+      await sendDocument(phone, url, "test.pdf");
+      return;
+    }
+    if (buttonId === "test-text") {
+      const msg = await generateText({ note: "test message" });
+      await sendText(phone, msg);
       return;
     }
   }
 
-  // First contact or any text — send welcome + buttons
+  // First contact — send welcome + buttons
   if (!conversation.collectedData.welcomeSent) {
     await db.collection("conversations").doc(conversation.conversationId).update({
       "collectedData.welcomeSent": true,
@@ -35,6 +71,15 @@ export async function discovery(
       { id: "birthday", title: "🎂 Birthday" },
       { id: "shop", title: "🛍 Shop Promo" },
       { id: "event", title: "🎉 Event Invite" },
+    ]);
+    await sendButtons(phone, "🧪 *Test media types:*", [
+      { id: "test-video", title: "🎬 Video" },
+      { id: "test-image", title: "🖼 Image" },
+      { id: "test-audio", title: "🎵 Audio" },
+    ]);
+    await sendButtons(phone, "​", [
+      { id: "test-pdf", title: "📄 PDF" },
+      { id: "test-text", title: "💬 Text" },
     ]);
     return;
   }
@@ -61,24 +106,26 @@ export async function discovery(
 }
 
 async function initiateFlow(phone: string, conversationId: string, useCase: UseCase): Promise<void> {
-  const config = getFlowConfig(useCase);
-
   await db.collection("conversations").doc(conversationId).update({
     useCase,
-    status: "form_sent",
+    status: "refining",
     updatedAt: new Date(),
   });
 
-  await sendText(phone, `Great choice! Let me pull up a quick form for your ${config.name}. 📋`);
+  logger.info("Flow initiated (conversational)", { phone, useCase });
 
-  await sendFlow(
+  const { flowEngine } = await import("./flowEngine");
+  const syntheticConversation = {
+    conversationId,
     phone,
-    config.waFlowId,
-    config.name,
-    `Please fill in the details for your ${config.name}.`
-  );
-
-  logger.info("Flow sent", { phone, useCase, flowId: config.waFlowId });
+    status: "refining" as const,
+    useCase,
+    collectedData: {},
+    lastMessageAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  await flowEngine(phone, { type: "text", phone, messageId: "", timestamp: "", text: "" }, syntheticConversation);
 }
 
 async function detectIntent(text: string): Promise<UseCase | null> {
