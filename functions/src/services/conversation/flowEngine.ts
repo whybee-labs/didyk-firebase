@@ -3,17 +3,17 @@ import { db } from "utils/firestore";
 import { ParsedMessage } from "services/whatsapp/parseWebhookPayload";
 import { sendText } from "services/whatsapp/sendText";
 import { callOpenAI } from "services/llm/openai";
-import { getFlowConfig, UseCase } from "config/flows";
-import { FlowField } from "config/flows/types";
+import { getProductConfig, UseCase } from "config/products";
+import { ProductField } from "config/products/types";
 import { Conversation } from "services/conversation/handleIncomingMessage";
-import { sendConfirmation } from "services/conversation/confirmation";
+import { sendUseCaseSelection } from "services/conversation/useCaseSelection";
 
 export async function flowEngine(
   phone: string,
   message: ParsedMessage,
   conversation: Conversation
 ): Promise<void> {
-  const config = getFlowConfig(conversation.useCase as UseCase);
+  const config = getProductConfig(conversation.useCase as UseCase);
   let collectedData = { ...conversation.collectedData };
 
   // Handle media uploads directly — no LLM needed
@@ -41,7 +41,7 @@ export async function flowEngine(
 
     // Check if all fields complete after this image
     if (isComplete(config.fields, collectedData)) {
-      await sendConfirmation(phone, { ...conversation, collectedData });
+      await sendUseCaseSelection(phone, { ...conversation, collectedData });
     }
     return;
   }
@@ -58,7 +58,7 @@ export async function flowEngine(
       }
     }
     if (isComplete(config.fields, collectedData)) {
-      await sendConfirmation(phone, { ...conversation, collectedData });
+      await sendUseCaseSelection(phone, { ...conversation, collectedData });
       return;
     }
   }
@@ -79,7 +79,7 @@ export async function flowEngine(
     }
 
     if (isComplete(config.fields, collectedData)) {
-      await sendConfirmation(phone, { ...conversation, collectedData });
+      await sendUseCaseSelection(phone, { ...conversation, collectedData });
       return;
     }
 
@@ -97,7 +97,7 @@ export async function flowEngine(
   }
 }
 
-function isComplete(fields: FlowField[], data: Record<string, unknown>): boolean {
+function isComplete(fields: ProductField[], data: Record<string, unknown>): boolean {
   return fields.every((f) => {
     if (!f.required) return true;
     if (f.type === "media") {
@@ -108,7 +108,7 @@ function isComplete(fields: FlowField[], data: Record<string, unknown>): boolean
   });
 }
 
-function getNextMissingField(fields: FlowField[], data: Record<string, unknown>): FlowField | null {
+function getNextMissingField(fields: ProductField[], data: Record<string, unknown>): ProductField | null {
   return (
     fields.find((f) => {
       if (!f.required) return false;
@@ -128,10 +128,10 @@ interface LLMResult {
 }
 
 async function extractWithLLM(
-  fields: FlowField[],
+  fields: ProductField[],
   collectedData: Record<string, unknown>,
   userMessage: string,
-  flowName: string
+  productName: string
 ): Promise<LLMResult> {
   const fieldSummary = fields
     .filter((f) => f.type === "text")
@@ -141,7 +141,7 @@ async function extractWithLLM(
     })
     .join("\n");
 
-  const system = `You are collecting information to create a ${flowName} video on WhatsApp.
+  const system = `You are collecting information to create ${productName} content on WhatsApp.
 Current field state:
 ${fieldSummary}
 

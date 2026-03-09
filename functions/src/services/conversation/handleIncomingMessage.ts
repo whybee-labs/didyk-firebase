@@ -3,15 +3,18 @@ import { FieldValue } from "firebase-admin/firestore";
 import { db } from "utils/firestore";
 import { ParsedMessage } from "services/whatsapp/parseWebhookPayload";
 import { sendText } from "services/whatsapp/sendText";
-import { getFlowConfig, UseCase } from "config/flows";
+import { getProductConfig, UseCase } from "config/products";
 import { discovery } from "services/conversation/discovery";
 import { flowEngine } from "services/conversation/flowEngine";
 import { handleConfirmation } from "services/conversation/confirmation";
+import { handleUseCaseSelection } from "services/conversation/useCaseSelection";
 
 export type ConversationStatus =
   | "discovery"
+  | "browsing"
   | "form_sent"
   | "refining"
+  | "selecting_usecases"
   | "confirming"
   | "generating"
   | "awaiting_payment"
@@ -24,6 +27,8 @@ export interface Conversation {
   status: ConversationStatus;
   useCase?: UseCase;
   collectedData: Record<string, unknown>;
+  browsePath?: string[];
+  selectedUseCaseIds?: string[];
   lastMessageAt: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -51,9 +56,18 @@ export async function handleIncomingMessage(
       status: "discovery",
       useCase: FieldValue.delete(),
       collectedData: {},
+      browsePath: FieldValue.delete(),
+      selectedUseCaseIds: FieldValue.delete(),
       updatedAt: new Date(),
     });
-    conversation = { ...conversation, status: "discovery", useCase: undefined, collectedData: {} };
+    conversation = {
+      ...conversation,
+      status: "discovery",
+      useCase: undefined,
+      collectedData: {},
+      browsePath: undefined,
+      selectedUseCaseIds: undefined,
+    };
   }
 
   logger.info("Routing message", {
@@ -81,12 +95,22 @@ export async function handleIncomingMessage(
       await discovery(phone, message, conversation);
       break;
 
+    case "browsing": {
+      const { browsing } = await import("services/conversation/browsing");
+      await browsing(phone, message, conversation);
+      break;
+    }
+
     case "form_sent":
       await handleFormReply(phone, message, conversation);
       break;
 
     case "refining":
       await flowEngine(phone, message, conversation);
+      break;
+
+    case "selecting_usecases":
+      await handleUseCaseSelection(phone, message, conversation);
       break;
 
     case "confirming":
@@ -116,7 +140,7 @@ async function handleFormReply(
     return;
   }
 
-  const config = getFlowConfig(conversation.useCase as UseCase);
+  const config = getProductConfig(conversation.useCase as UseCase);
   const firestoreUpdates: Record<string, unknown> = {};
   const localUpdates: Record<string, unknown> = {};
 

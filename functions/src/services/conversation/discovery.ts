@@ -2,51 +2,79 @@ import { logger } from "firebase-functions";
 import { db } from "utils/firestore";
 import { ParsedMessage } from "services/whatsapp/parseWebhookPayload";
 import { sendButtons } from "services/whatsapp/sendButtons";
-import { callOpenAI } from "services/llm/openai";
-import { flowMap, UseCase } from "config/flows";
+import { sendList } from "services/whatsapp/sendList";
+import { catalog, popularProducts } from "config/catalog";
+import { UseCase } from "config/products";
 import { Conversation } from "services/conversation/handleIncomingMessage";
 
-const WELCOME_MESSAGE =
-  "👋 Welcome to *Whybee*! I create personalised content for you.\n\nWhat would you like to make today?";
+const WELCOME_BODY =
+  "👋 Welcome to *Whybee*! I create personalised content for you.\n\nHere are some popular options — or browse the full catalog below 👇";
 
 export async function discovery(
   phone: string,
   message: ParsedMessage,
   conversation: Conversation
 ): Promise<void> {
-  // Button tap — direct intent, no LLM needed
-  if (message.type === "button_reply") {
-    const buttonId = message.buttonId;
+  const cid = conversation.conversationId;
 
-    if (buttonId && buttonId in flowMap) {
-      await initiateFlow(phone, conversation.conversationId, buttonId as UseCase);
-      return;
-    }
+  // Popular product button tapped — skip category, go straight to that product's use cases
+  if (message.type === "button_reply" && message.buttonId?.startsWith("prod-")) {
+    const browsePath = [message.buttonId];
+    await db.collection("conversations").doc(cid).update({
+      status: "browsing",
+      browsePath,
+      updatedAt: new Date(),
+    });
+    const { browsing } = await import("services/conversation/browsing");
+    await browsing(phone, message, { ...conversation, status: "browsing", browsePath });
+    return;
   }
 
-  // User typed free text — try LLM intent detection
-  if (message.type === "text" && message.text) {
-    const detected = await detectIntent(message.text);
-    if (detected) {
-      await initiateFlow(phone, conversation.conversationId, detected);
-      return;
-    }
+  // Category selected from the browse list
+  if (message.type === "list_reply" && message.listId?.startsWith("cat-")) {
+    const browsePath = [message.listId];
+    await db.collection("conversations").doc(cid).update({
+      status: "browsing",
+      browsePath,
+      updatedAt: new Date(),
+    });
+    const { browsing } = await import("services/conversation/browsing");
+    await browsing(phone, message, { ...conversation, status: "browsing", browsePath });
+    return;
   }
 
-  // Show welcome + buttons (first contact, unrecognised text, or after reset)
-  await sendButtons(conversation.conversationId, phone, WELCOME_MESSAGE,
-    Object.values(flowMap).map(f => ({ id: f.id, title: f.buttonTitle }))
-  );
+  // Everything else — show welcome
+  await sendWelcome(cid, phone);
 }
 
-async function initiateFlow(phone: string, conversationId: string, useCase: UseCase): Promise<void> {
+async function sendWelcome(conversationId: string, phone: string): Promise<void> {
+  const popular = popularProducts();
+
+  // Message 1: popular product quick-pick buttons
+  await sendButtons(conversationId, phone, WELCOME_BODY,
+    popular.map((p) => ({ id: p.id, title: p.label }))
+  );
+
+  // Message 2: full category browse list
+  await sendList(conversationId, phone, "📂 Browse all categories:", "Browse All", [
+    {
+      rows: catalog.map((c) => ({
+        id: c.id,
+        title: c.label,
+        description: c.description,
+      })),
+    },
+  ]);
+}
+
+export async function initiateFlow(phone: string, conversationId: string, useCase: UseCase): Promise<void> {
   await db.collection("conversations").doc(conversationId).update({
     useCase,
     status: "refining",
     updatedAt: new Date(),
   });
 
-  logger.info("Flow initiated (conversational)", { phone, useCase });
+  logger.info("Flow initiated", { phone, useCase });
 
   const { flowEngine } = await import("services/conversation/flowEngine");
   const syntheticConversation = {
@@ -60,19 +88,4 @@ async function initiateFlow(phone: string, conversationId: string, useCase: UseC
     updatedAt: new Date(),
   };
   await flowEngine(phone, { type: "text", phone, messageId: "", timestamp: "", text: "" }, syntheticConversation);
-}
-
-async function detectIntent(text: string): Promise<UseCase | null> {
-  const system = `You detect user intent for a WhatsApp content creation service.
-We offer: birthday content, shop promo content, event invite content.
-Return JSON: { "useCase": "birthday" | "shop" | "event" | null }
-Return null if the intent is unclear.`;
-
-  try {
-    const raw = await callOpenAI(system, text);
-    const parsed = JSON.parse(raw) as { useCase: UseCase | null };
-    return parsed.useCase ?? null;
-  } catch {
-    return null;
-  }
 }

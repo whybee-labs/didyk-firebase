@@ -5,8 +5,9 @@ import { sendVideo } from "services/whatsapp/sendVideo";
 import { sendImage } from "services/whatsapp/sendImage";
 import { sendDocument } from "services/whatsapp/sendDocument";
 import { sendAudio } from "services/whatsapp/sendAudio";
-import { getFlowConfig, UseCase } from "config/flows";
-import { OutputType } from "config/flows/types";
+import { getProductConfig, UseCase } from "config/products";
+import { OutputType } from "config/products/types";
+import { findUseCase } from "config/catalog";
 import { createPaymentLink } from "services/payment/createPaymentLink";
 import { Conversation } from "services/conversation/handleIncomingMessage";
 
@@ -18,15 +19,19 @@ export async function startFulfillment(phone: string, conversation: Conversation
     updatedAt: new Date(),
   });
 
-  const config = getFlowConfig(conversation.useCase as UseCase);
+  const config = getProductConfig(conversation.useCase as UseCase);
   const cid = conversation.conversationId;
 
-  // Generate and send all outputs defined by the flow config
   await sendText(cid, phone, "🎬 Here's your preview!");
 
-  for (const output of config.outputs) {
-    const result = await output.generate(conversation.collectedData);
-    await dispatchOutput(cid, phone, output.type, result);
+  // Generate and send outputs for each selected use case
+  for (const ucId of conversation.selectedUseCaseIds ?? []) {
+    const uc = findUseCase(ucId);
+    if (!uc?.outputs) continue;
+    for (const output of uc.outputs) {
+      const result = await output.generate(conversation.collectedData);
+      await dispatchOutput(cid, phone, output.type, result);
+    }
   }
 
   // Create Razorpay payment link and send to user

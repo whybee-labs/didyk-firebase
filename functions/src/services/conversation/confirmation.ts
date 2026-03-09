@@ -2,12 +2,12 @@ import { FieldValue } from "firebase-admin/firestore";
 import { db } from "utils/firestore";
 import { sendButtons } from "services/whatsapp/sendButtons";
 import { sendText } from "services/whatsapp/sendText";
-import { getFlowConfig, UseCase } from "config/flows";
+import { getProductConfig, UseCase } from "config/products";
 import { Conversation } from "./handleIncomingMessage";
 import { startFulfillment } from "./fulfillment";
 
 export async function sendConfirmation(phone: string, conversation: Conversation): Promise<void> {
-  const config = getFlowConfig(conversation.useCase as UseCase);
+  const config = getProductConfig(conversation.useCase as UseCase);
   const summary = config.confirmationTemplate(conversation.collectedData);
 
   await db.collection("conversations").doc(conversation.conversationId).update({
@@ -48,6 +48,8 @@ async function resetConversation(phone: string, conversation: Conversation): Pro
     status: "discovery",
     useCase: FieldValue.delete(),
     collectedData: {},
+    browsePath: FieldValue.delete(),
+    selectedUseCaseIds: FieldValue.delete(),
     updatedAt: new Date(),
   });
 
@@ -57,5 +59,7 @@ async function resetConversation(phone: string, conversation: Conversation): Pro
     status: "discovery",
     useCase: undefined,
     collectedData: {},
+    browsePath: undefined,
+    selectedUseCaseIds: undefined,
   });
 }
