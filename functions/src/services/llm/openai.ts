@@ -1,10 +1,13 @@
 import OpenAI from "openai";
-import { OPENAI_API_KEY } from "../../config/env";
+import { GROQ_API_KEY } from "../../config/env";
 
-const MODEL = "gpt-4.1-nano";
+const MODEL = "llama-3.1-8b-instant";
 
 function getClient(): OpenAI {
-  return new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+  return new OpenAI({
+    apiKey: GROQ_API_KEY.value(),
+    baseURL: "https://api.groq.com/openai/v1",
+  });
 }
 
 export async function callOpenAI(

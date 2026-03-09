@@ -7,5 +7,5 @@ Respond with only the message text — no quotes, no labels, no JSON.`;
 
   const user = `Data: ${JSON.stringify(data)}`;
 
-  return callOpenAI(system, user, false);
+  return callOpenAI(system, user);
 }

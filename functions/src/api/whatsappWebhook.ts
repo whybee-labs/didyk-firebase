@@ -5,13 +5,13 @@ import {
   WHATSAPP_VERIFY_TOKEN,
   WHATSAPP_ACCESS_TOKEN,
   WHATSAPP_PHONE_NUMBER_ID,
-  OPENAI_API_KEY,
+  GROQ_API_KEY,
 } from "../config/env";
 import { parseWebhookPayload } from "../services/whatsapp/parseWebhookPayload";
 import { handleIncomingMessage } from "../services/conversation/handleIncomingMessage";
 
 export const whatsappWebhook = onRequest(
-  { secrets: [WHATSAPP_VERIFY_TOKEN, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, OPENAI_API_KEY] },
+  { secrets: [WHATSAPP_VERIFY_TOKEN, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, GROQ_API_KEY] },
   async (req, res) => {
     if (req.method === "GET") {
       handleVerification(req, res);
