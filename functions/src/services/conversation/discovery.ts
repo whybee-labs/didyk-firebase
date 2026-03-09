@@ -17,7 +17,7 @@ import { generatePdf } from "../generators/pdfGenerator";
 import { generateText } from "../generators/textGenerator";
 
 const WELCOME_MESSAGE =
-  "👋 Welcome to *Whybee*! I can create personalised videos for you.\n\nWhat would you like to make today?";
+  "👋 Welcome to *Whybee*! I create personalised content for you.\n\nWhat would you like to make today?";
 
 export async function discovery(
   phone: string,
@@ -67,19 +67,19 @@ export async function discovery(
       "collectedData.welcomeSent": true,
       updatedAt: new Date(),
     });
-    await sendButtons(phone, WELCOME_MESSAGE, [
-      { id: "birthday", title: "🎂 Birthday" },
-      { id: "shop", title: "🛍 Shop Promo" },
-      { id: "event", title: "🎉 Event Invite" },
-    ]);
     await sendButtons(phone, "🧪 *Test media types:*", [
       { id: "test-video", title: "🎬 Video" },
       { id: "test-image", title: "🖼 Image" },
       { id: "test-audio", title: "🎵 Audio" },
     ]);
-    await sendButtons(phone, "​", [
+    await sendButtons(phone, "🧪 *More test types:*", [
       { id: "test-pdf", title: "📄 PDF" },
       { id: "test-text", title: "💬 Text" },
+    ]);
+    await sendButtons(phone, WELCOME_MESSAGE, [
+      { id: "birthday", title: "🎂 Birthdays" },
+      { id: "shop", title: "🛍 Shop Promos" },
+      { id: "event", title: "🎉 Event Invites" },
     ]);
     return;
   }
@@ -129,8 +129,8 @@ async function initiateFlow(phone: string, conversationId: string, useCase: UseC
 }
 
 async function detectIntent(text: string): Promise<UseCase | null> {
-  const system = `You detect user intent for a WhatsApp video creation service.
-We offer: birthday videos, shop promo videos, event invite videos.
+  const system = `You detect user intent for a WhatsApp content creation service.
+We offer: birthday content, shop promo content, event invite content.
 Return JSON: { "useCase": "birthday" | "shop" | "event" | null }
 Return null if the intent is unclear.`;
 

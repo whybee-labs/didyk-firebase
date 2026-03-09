@@ -1,6 +1,6 @@
 // TODO: replace with real audio generation service
 const PLACEHOLDER_AUDIO_URL =
-  "https://www.w3.org/WAI/WCAG21/Techniques/general/sample.mp3";
+  "https://samplelib.com/lib/preview/mp3/sample-3s.mp3";
 
 export async function generateAudio(data: Record<string, unknown>): Promise<string> {
   void data; // will be used by real implementation
