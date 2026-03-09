@@ -8,6 +8,10 @@ import { ProductField } from "config/products/types";
 import { Conversation } from "services/conversation/handleIncomingMessage";
 import { sendUseCaseSelection } from "services/conversation/useCaseSelection";
 
+async function onFormComplete(phone: string, conversation: Conversation): Promise<void> {
+  await sendUseCaseSelection(phone, conversation);
+}
+
 export async function flowEngine(
   phone: string,
   message: ParsedMessage,
@@ -41,7 +45,7 @@ export async function flowEngine(
 
     // Check if all fields complete after this image
     if (isComplete(config.fields, collectedData)) {
-      await sendUseCaseSelection(phone, { ...conversation, collectedData });
+      await onFormComplete(phone, { ...conversation, collectedData });
     }
     return;
   }
@@ -58,7 +62,7 @@ export async function flowEngine(
       }
     }
     if (isComplete(config.fields, collectedData)) {
-      await sendUseCaseSelection(phone, { ...conversation, collectedData });
+      await onFormComplete(phone, { ...conversation, collectedData });
       return;
     }
   }
@@ -79,7 +83,7 @@ export async function flowEngine(
     }
 
     if (isComplete(config.fields, collectedData)) {
-      await sendUseCaseSelection(phone, { ...conversation, collectedData });
+      await onFormComplete(phone, { ...conversation, collectedData });
       return;
     }
 

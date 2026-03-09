@@ -2,20 +2,18 @@ import { db } from "utils/firestore";
 import { ParsedMessage } from "services/whatsapp/parseWebhookPayload";
 import { sendText } from "services/whatsapp/sendText";
 import { sendList } from "services/whatsapp/sendList";
-import { catalog, findUseCase } from "config/catalog";
+import { getProductConfig, UseCase } from "config/products";
+import { findProduct, findUseCase } from "config/catalog";
 import { Conversation } from "services/conversation/handleIncomingMessage";
 import { sendConfirmation } from "services/conversation/confirmation";
 
 export async function sendUseCaseSelection(phone: string, conversation: Conversation): Promise<void> {
-  // Find which product corresponds to the current useCase
-  const product = catalog
-    .flatMap((c) => c.products)
-    .find((p) => p.productConfigId === conversation.useCase);
+  const config = getProductConfig(conversation.useCase as UseCase);
 
-  if (!product) {
-    await sendText(conversation.conversationId, phone, "Something went wrong. Please type *hi* to start over.");
-    return;
-  }
+  // Use the specific catalog product's use cases if we navigated to one via browsePath
+  const prodId = [...(conversation.browsePath ?? [])].reverse().find((s) => s.startsWith("prod-"));
+  const catalogProduct = prodId ? findProduct(prodId) : null;
+  const useCases = catalogProduct?.useCases ?? config.useCases;
 
   await db.collection("conversations").doc(conversation.conversationId).update({
     status: "selecting_usecases",
@@ -25,11 +23,11 @@ export async function sendUseCaseSelection(phone: string, conversation: Conversa
   await sendList(
     conversation.conversationId,
     phone,
-    `Great! Now choose what you'd like created for your ${product.label}:`,
+    `Great! Now choose what you'd like created for your ${config.name}:`,
     "Choose",
     [
       {
-        rows: product.useCases.map((uc) => ({
+        rows: useCases.map((uc) => ({
           id: uc.id,
           title: uc.label,
           description: uc.description,
@@ -51,12 +49,7 @@ export async function handleUseCaseSelection(
 
   const uc = findUseCase(message.listId);
   if (!uc) {
-    await sendUseCaseSelection(phone, conversation);
-    return;
-  }
-
-  if (!uc.outputs || uc.outputs.length === 0) {
-    await sendText(conversation.conversationId, phone, "🔜 Coming soon! We're working hard on this one. Check back later!");
+    await sendText(conversation.conversationId, phone, "Something went wrong. Please try again.");
     await sendUseCaseSelection(phone, conversation);
     return;
   }

@@ -15,12 +15,20 @@ export interface UseCaseOutput {
   generate: (data: Record<string, unknown>) => Promise<string>;
 }
 
+export interface CatalogUseCase {
+  id: string;
+  label: string;
+  description: string;
+  outputs: UseCaseOutput[];
+}
+
 export interface ProductConfig {
-  id: "birthday" | "shop" | "event";
+  id: "birthday" | "business" | "event";
   name: string;
   description: string;
   waFlowId: string;                                            // Meta WhatsApp Flow ID (placeholder)
   fields: ProductField[];
+  useCases: CatalogUseCase[];
   confirmationTemplate: (data: Record<string, unknown>) => string;
   pricing: { amount: number; currency: "INR" };                // amount in INR
 }

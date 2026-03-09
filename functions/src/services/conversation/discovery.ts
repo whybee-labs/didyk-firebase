@@ -3,7 +3,7 @@ import { db } from "utils/firestore";
 import { ParsedMessage } from "services/whatsapp/parseWebhookPayload";
 import { sendButtons } from "services/whatsapp/sendButtons";
 import { sendList } from "services/whatsapp/sendList";
-import { catalog, popularProducts } from "config/catalog";
+import { catalog, findProduct, popularProducts } from "config/catalog";
 import { UseCase } from "config/products";
 import { Conversation } from "services/conversation/handleIncomingMessage";
 
@@ -17,20 +17,23 @@ export async function discovery(
 ): Promise<void> {
   const cid = conversation.conversationId;
 
-  // Popular product button tapped — skip category, go straight to that product's use cases
+  // Popular product button tapped — go straight to form, no browsing step
   if (message.type === "button_reply" && message.buttonId?.startsWith("prod-")) {
-    const browsePath = [message.buttonId];
-    await db.collection("conversations").doc(cid).update({
-      status: "browsing",
-      browsePath,
-      updatedAt: new Date(),
-    });
-    const { browsing } = await import("services/conversation/browsing");
-    await browsing(phone, message, { ...conversation, status: "browsing", browsePath });
+    const prodId = message.buttonId;
+    const product = findProduct(prodId);
+    if (product?.productConfigId) {
+      await db.collection("conversations").doc(cid).update({
+        browsePath: [prodId],
+        updatedAt: new Date(),
+      });
+      await initiateFlow(phone, cid, product.productConfigId, [prodId]);
+    } else {
+      await sendWelcome(cid, phone);
+    }
     return;
   }
 
-  // Category selected from the browse list
+  // Category selected from the browse list — enter browsing state
   if (message.type === "list_reply" && message.listId?.startsWith("cat-")) {
     const browsePath = [message.listId];
     await db.collection("conversations").doc(cid).update({
@@ -67,7 +70,12 @@ async function sendWelcome(conversationId: string, phone: string): Promise<void>
   ]);
 }
 
-export async function initiateFlow(phone: string, conversationId: string, useCase: UseCase): Promise<void> {
+export async function initiateFlow(
+  phone: string,
+  conversationId: string,
+  useCase: UseCase,
+  browsePath?: string[]
+): Promise<void> {
   await db.collection("conversations").doc(conversationId).update({
     useCase,
     status: "refining",
@@ -83,6 +91,7 @@ export async function initiateFlow(phone: string, conversationId: string, useCas
     status: "refining" as const,
     useCase,
     collectedData: {},
+    browsePath,
     lastMessageAt: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),

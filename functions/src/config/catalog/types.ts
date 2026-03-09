@@ -1,12 +1,5 @@
 import { UseCase } from "config/products";
-import { UseCaseOutput } from "config/products/types";
-
-export interface CatalogUseCase {
-  id: string;
-  label: string;
-  description: string;
-  outputs?: UseCaseOutput[];    // absent = coming soon; present = live
-}
+import { CatalogUseCase } from "config/products/types";
 
 export interface CatalogProduct {
   id: string;
@@ -23,3 +16,5 @@ export interface CatalogCategory {
   description: string;
   products: CatalogProduct[];
 }
+
+export { CatalogUseCase };

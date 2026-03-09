@@ -1,7 +1,10 @@
 import { generateVideo } from "services/generators/videoGenerator";
-import { generateText } from "services/generators/textGenerator";
 import { generateImage } from "services/generators/imageGenerator";
 import { generatePdf } from "services/generators/pdfGenerator";
+import { generateText } from "services/generators/textGenerator";
+import { birthdayProduct } from "config/products/birthday";
+import { businessProduct } from "config/products/business";
+import { eventProduct } from "config/products/event";
 import { CatalogCategory, CatalogProduct, CatalogUseCase } from "./types";
 
 export const catalog: CatalogCategory[] = [
@@ -16,37 +19,48 @@ export const catalog: CatalogCategory[] = [
         description: "Celebrate someone special",
         popular: true,
         productConfigId: "birthday",
-        useCases: [
-          {
-            id: "uc-birthday-video",
-            label: "Birthday Video",
-            description: "A personalised video with photos and wishes",
-            outputs: [
-              { type: "video", generate: generateVideo },
-              { type: "text", generate: generateText },
-            ],
-          },
-          {
-            id: "uc-birthday-card",
-            label: "Birthday Card",
-            description: "A beautiful digital birthday card",
-          },
-          {
-            id: "uc-photo-collage",
-            label: "Photo Collage",
-            description: "A photo collage with a personalised message",
-          },
-        ],
+        useCases: birthdayProduct.useCases,
       },
       {
         id: "prod-anniversaries",
         label: "💍 Anniversaries",
         description: "Mark milestones and special moments",
+        productConfigId: "birthday",
         useCases: [
           {
             id: "uc-anniversary-video",
             label: "Anniversary Video",
             description: "A heartfelt anniversary video",
+            outputs: [{ type: "video", generate: generateVideo }],
+          },
+          {
+            id: "uc-anniversary-card",
+            label: "Anniversary Card",
+            description: "A beautiful digital anniversary card",
+            outputs: [{ type: "image", generate: generateImage }],
+          },
+        ],
+      },
+      {
+        id: "prod-weddings",
+        label: "💒 Weddings",
+        description: "Wedding invites and announcements",
+        productConfigId: "birthday",
+        useCases: [
+          {
+            id: "uc-wedding-invite",
+            label: "Wedding Invite",
+            description: "An elegant wedding invitation video",
+            outputs: [
+              { type: "video", generate: generateVideo },
+              { type: "pdf", generate: generatePdf },
+            ],
+          },
+          {
+            id: "uc-wedding-card",
+            label: "Wedding Card",
+            description: "A digital wedding invitation card",
+            outputs: [{ type: "image", generate: generateImage }],
           },
         ],
       },
@@ -63,32 +77,25 @@ export const catalog: CatalogCategory[] = [
         description: "Invite people to your event",
         popular: true,
         productConfigId: "event",
-        useCases: [
-          {
-            id: "uc-event-invite",
-            label: "Event Invite",
-            description: "A video invite with event details and photos",
-            outputs: [
-              { type: "video", generate: generateVideo },
-              { type: "pdf", generate: generatePdf },
-            ],
-          },
-          {
-            id: "uc-event-card",
-            label: "Event Card",
-            description: "A digital event invitation card",
-          },
-        ],
+        useCases: eventProduct.useCases,
       },
       {
-        id: "prod-weddings",
-        label: "💒 Weddings",
-        description: "Wedding invites and announcements",
+        id: "prod-parties",
+        label: "🥳 Parties",
+        description: "Birthday parties, housewarmings & celebrations",
+        productConfigId: "event",
         useCases: [
           {
-            id: "uc-wedding-invite",
-            label: "Wedding Invite",
-            description: "An elegant wedding invitation",
+            id: "uc-party-invite",
+            label: "Party Invite",
+            description: "A fun party invitation video",
+            outputs: [{ type: "video", generate: generateVideo }],
+          },
+          {
+            id: "uc-party-card",
+            label: "Party Card",
+            description: "A colourful digital party invite card",
+            outputs: [{ type: "image", generate: generateImage }],
           },
         ],
       },
@@ -96,41 +103,34 @@ export const catalog: CatalogCategory[] = [
   },
   {
     id: "cat-business",
-    label: "Business Promotions",
+    label: "Business",
     description: "Promos, launches & announcements",
     products: [
       {
         id: "prod-business-promos",
         label: "🛍️ Business Promos",
-        description: "Promote your shop or business",
+        description: "Promote your business",
         popular: true,
-        productConfigId: "shop",
-        useCases: [
-          {
-            id: "uc-shop-promo-poster",
-            label: "Promo Poster",
-            description: "An eye-catching promotional poster",
-            outputs: [
-              { type: "image", generate: generateImage },
-              { type: "text", generate: generateText },
-            ],
-          },
-          {
-            id: "uc-shop-promo-video",
-            label: "Promo Video",
-            description: "A short promotional video for your business",
-          },
-        ],
+        productConfigId: "business",
+        useCases: businessProduct.useCases,
       },
       {
         id: "prod-product-launch",
         label: "🚀 Product Launch",
         description: "Announce a new product or service",
+        productConfigId: "business",
         useCases: [
           {
-            id: "uc-product-launch",
-            label: "Launch Announcement",
-            description: "A compelling product launch announcement",
+            id: "uc-launch-video",
+            label: "Launch Video",
+            description: "A punchy product launch video",
+            outputs: [{ type: "video", generate: generateVideo }],
+          },
+          {
+            id: "uc-launch-poster",
+            label: "Launch Poster",
+            description: "A bold product launch poster",
+            outputs: [{ type: "image", generate: generateImage }],
           },
         ],
       },
@@ -142,29 +142,54 @@ export const catalog: CatalogCategory[] = [
     description: "Posts, reels & story cards",
     products: [
       {
-        id: "prod-social-media",
-        label: "📱 Social Media",
-        description: "Content for your social channels",
+        id: "prod-instagram",
+        label: "📸 Instagram",
+        description: "Feed posts, reels & stories",
+        productConfigId: "business",
         useCases: [
           {
             id: "uc-instagram-post",
-            label: "Instagram Post",
-            description: "A polished square post for Instagram",
+            label: "Feed Post",
+            description: "A polished square post for your feed",
+            outputs: [{ type: "image", generate: generateImage }],
           },
           {
-            id: "uc-whatsapp-status",
-            label: "WhatsApp Status",
-            description: "An eye-catching status update",
-          },
-          {
-            id: "uc-reels",
-            label: "Reels",
+            id: "uc-instagram-reel",
+            label: "Reel",
             description: "A short-form vertical video",
+            outputs: [{ type: "video", generate: generateVideo }],
+          },
+          {
+            id: "uc-instagram-story",
+            label: "Story Card",
+            description: "An eye-catching story graphic",
+            outputs: [{ type: "image", generate: generateImage }],
+          },
+        ],
+      },
+      {
+        id: "prod-whatsapp-status",
+        label: "💬 WhatsApp Status",
+        description: "Status updates and broadcasts",
+        productConfigId: "business",
+        useCases: [
+          {
+            id: "uc-status-image",
+            label: "Status Image",
+            description: "A striking image for your status",
+            outputs: [{ type: "image", generate: generateImage }],
+          },
+          {
+            id: "uc-status-video",
+            label: "Status Video",
+            description: "A short video for your status",
+            outputs: [{ type: "video", generate: generateVideo }],
           },
           {
             id: "uc-quote-poster",
             label: "Quote Poster",
             description: "A beautifully designed quote card",
+            outputs: [{ type: "image", generate: generateImage }],
           },
         ],
       },
@@ -176,24 +201,45 @@ export const catalog: CatalogCategory[] = [
     description: "Flyers, posters & brochures",
     products: [
       {
-        id: "prod-documents",
-        label: "📄 Documents",
-        description: "Print-ready and digital documents",
+        id: "prod-flyers",
+        label: "📄 Flyers & Posters",
+        description: "Print-ready promotional materials",
+        productConfigId: "business",
         useCases: [
           {
             id: "uc-flyer",
             label: "Flyer",
             description: "A promotional flyer for any occasion",
+            outputs: [
+              { type: "image", generate: generateImage },
+              { type: "pdf", generate: generatePdf },
+            ],
           },
           {
-            id: "uc-event-poster",
-            label: "Event Poster",
-            description: "A striking event poster",
+            id: "uc-poster",
+            label: "Poster",
+            description: "A large-format event or promo poster",
+            outputs: [
+              { type: "image", generate: generateImage },
+              { type: "pdf", generate: generatePdf },
+            ],
           },
+        ],
+      },
+      {
+        id: "prod-brochures",
+        label: "📋 Brochures",
+        description: "Professional brochures and lookbooks",
+        productConfigId: "business",
+        useCases: [
           {
             id: "uc-brochure",
             label: "Brochure",
             description: "A professional brochure or lookbook",
+            outputs: [
+              { type: "pdf", generate: generatePdf },
+              { type: "text", generate: generateText },
+            ],
           },
         ],
       },
