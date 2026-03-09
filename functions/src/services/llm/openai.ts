@@ -13,7 +13,8 @@ function getClient(): OpenAI {
 export async function callOpenAI(
   systemPrompt: string,
   userMessage: string,
-  jsonMode = true
+  jsonMode = true,
+  history?: Array<{ role: "user" | "assistant"; content: string }>
 ): Promise<string> {
   const client = getClient();
 
@@ -22,6 +23,7 @@ export async function callOpenAI(
     ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
     messages: [
       { role: "system", content: systemPrompt },
+      ...(history ?? []),
       { role: "user", content: userMessage },
     ],
     temperature: 0.2,

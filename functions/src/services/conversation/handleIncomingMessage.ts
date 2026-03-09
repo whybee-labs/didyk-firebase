@@ -22,6 +22,11 @@ export type ConversationStatus =
   | "completed"
   | "error";
 
+export interface HistoryEntry {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface Conversation {
   conversationId: string; // not stored in Firestore — populated from doc ID on read
   phone: string;
@@ -30,6 +35,7 @@ export interface Conversation {
   collectedData: Record<string, unknown>;
   browsePath?: string[];
   selectedUseCaseIds?: string[];
+  messageHistory?: HistoryEntry[];
   lastMessageAt: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -59,6 +65,7 @@ export async function handleIncomingMessage(
       collectedData: {},
       browsePath: FieldValue.delete(),
       selectedUseCaseIds: FieldValue.delete(),
+      messageHistory: FieldValue.delete(),
       updatedAt: new Date(),
     });
     conversation = {
@@ -68,6 +75,7 @@ export async function handleIncomingMessage(
       collectedData: {},
       browsePath: undefined,
       selectedUseCaseIds: undefined,
+      messageHistory: undefined,
     };
   }
 

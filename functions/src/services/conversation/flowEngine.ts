@@ -5,9 +5,15 @@ import { sendText } from "services/whatsapp/sendText";
 import { callOpenAI } from "services/llm/openai";
 import { getProductConfig, UseCase } from "config/products";
 import { ProductField } from "config/products/types";
-import { Conversation } from "services/conversation/handleIncomingMessage";
+import { Conversation, HistoryEntry } from "services/conversation/handleIncomingMessage";
 import { sendUseCaseSelection } from "services/conversation/useCaseSelection";
 import { t } from "utils/t";
+
+const MAX_HISTORY_PAIRS = 5;
+
+function trimHistory(history: HistoryEntry[]): HistoryEntry[] {
+  return history.slice(-(MAX_HISTORY_PAIRS * 2));
+}
 
 async function onFormComplete(phone: string, conversation: Conversation): Promise<void> {
   await sendUseCaseSelection(phone, conversation);
@@ -42,7 +48,6 @@ export async function flowEngine(
       }
     }
 
-    // Check if all fields complete after this image
     if (isComplete(config.fields, collectedData)) {
       await onFormComplete(phone, { ...conversation, collectedData });
     }
@@ -67,34 +72,60 @@ export async function flowEngine(
 
   // LLM extracts any remaining text fields from the message
   if (message.type === "text" && message.text) {
-    const result = await extractWithLLM(config.fields, collectedData, message.text, config.name);
-    if (result.extractedFields && Object.keys(result.extractedFields).length > 0) {
-      const updates: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(result.extractedFields)) {
-        collectedData[key] = value;
-        updates[`collectedData.${key}`] = value;
-      }
-      await db.collection("conversations").doc(conversation.conversationId).update({
-        ...updates,
-        updatedAt: new Date(),
-      });
+    const history = conversation.messageHistory ?? [];
+    const extractedFields = await extractWithLLM(config.fields, collectedData, message.text, config.name, history);
+
+    const firestoreUpdates: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(extractedFields)) {
+      collectedData[key] = value;
+      firestoreUpdates[`collectedData.${key}`] = value;
     }
 
     if (isComplete(config.fields, collectedData)) {
+      if (Object.keys(firestoreUpdates).length > 0) {
+        await db.collection("conversations").doc(conversation.conversationId).update({
+          ...firestoreUpdates,
+          updatedAt: new Date(),
+        });
+      }
       await onFormComplete(phone, { ...conversation, collectedData });
       return;
     }
 
-    if (result.nextQuestion) {
-      await sendText(conversation.conversationId, phone, result.nextQuestion);
+    const nextField = getNextMissingField(config.fields, collectedData);
+    const question = nextField ? t("form.field.ask", { label: nextField.label }) : null;
+
+    const newHistory = trimHistory([
+      ...history,
+      { role: "user" as const, content: message.text },
+      ...(question ? [{ role: "assistant" as const, content: question }] : []),
+    ]);
+
+    await db.collection("conversations").doc(conversation.conversationId).update({
+      ...firestoreUpdates,
+      messageHistory: newHistory,
+      updatedAt: new Date(),
+    });
+
+    if (question) {
+      await sendText(conversation.conversationId, phone, question);
     }
     return;
   }
 
-  // Fallback — ask for next missing field
+  // Fallback — ask for next missing field (e.g. first question on flow start)
   const nextField = getNextMissingField(config.fields, collectedData);
   if (nextField) {
-    await sendText(conversation.conversationId, phone, t("form.field.ask", { label: nextField.label }));
+    const question = t("form.field.ask", { label: nextField.label });
+    const newHistory = trimHistory([
+      ...(conversation.messageHistory ?? []),
+      { role: "assistant" as const, content: question },
+    ]);
+    await db.collection("conversations").doc(conversation.conversationId).update({
+      messageHistory: newHistory,
+      updatedAt: new Date(),
+    });
+    await sendText(conversation.conversationId, phone, question);
   }
 }
 
@@ -122,18 +153,13 @@ function getNextMissingField(fields: ProductField[], data: Record<string, unknow
   );
 }
 
-interface LLMResult {
-  extractedFields: Record<string, unknown>;
-  nextQuestion: string;
-  isComplete: boolean;
-}
-
 async function extractWithLLM(
   fields: ProductField[],
   collectedData: Record<string, unknown>,
   userMessage: string,
-  productName: string
-): Promise<LLMResult> {
+  productName: string,
+  history: HistoryEntry[]
+): Promise<Record<string, unknown>> {
   const fieldSummary = fields
     .filter((f) => f.type === "text")
     .map((f) => {
@@ -143,20 +169,22 @@ async function extractWithLLM(
     .join("\n");
 
   const system = `You are collecting information to create ${productName} content on WhatsApp.
-Current field state:
+Fields to collect:
 ${fieldSummary}
 
-From the user's message, extract any field values present.
-Then determine the next question to ask for the next missing required field.
-Respond in JSON: { "extractedFields": { "fieldKey": "value" }, "nextQuestion": "...", "isComplete": false }
-isComplete = true only when all text fields above are filled (ignore media fields, those are handled separately).`;
+Based on the conversation history and the latest user message, extract any field values that match the fields above.
+Only extract values for the listed fields. Ignore anything not in the list.
+Use the conversation history to infer which field an ambiguous reply is answering.
+
+Respond ONLY in JSON: { "extractedFields": { "fieldKey": "value" } }
+If nothing can be extracted, respond with: { "extractedFields": {} }`;
 
   try {
-    const raw = await callOpenAI(system, userMessage);
-    const result = JSON.parse(raw) as LLMResult;
-    return result;
+    const raw = await callOpenAI(system, userMessage, true, history);
+    const result = JSON.parse(raw) as { extractedFields: Record<string, unknown> };
+    return result.extractedFields ?? {};
   } catch (err) {
     logger.warn("LLM extraction failed", { err });
-    return { extractedFields: {}, nextQuestion: "", isComplete: false };
+    return {};
   }
 }
