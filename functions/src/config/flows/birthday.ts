@@ -1,6 +1,6 @@
 import { FlowConfig } from "./types";
-import { generateVideo } from "../../services/generators/videoGenerator";
-import { generateText } from "../../services/generators/textGenerator";
+import { generateVideo } from "services/generators/videoGenerator";
+import { generateText } from "services/generators/textGenerator";
 
 export const birthdayFlow: FlowConfig = {
   id: "birthday",

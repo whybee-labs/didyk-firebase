@@ -5,9 +5,9 @@ import {
   RAZORPAY_WEBHOOK_SECRET,
   WHATSAPP_ACCESS_TOKEN,
   WHATSAPP_PHONE_NUMBER_ID,
-} from "../config/env";
-import { db } from "../utils/firestore";
-import { sendText } from "../services/whatsapp/sendText";
+} from "config/env";
+import { db } from "utils/firestore";
+import { sendText } from "services/whatsapp/sendText";
 
 export const razorpayWebhook = onRequest(
   { secrets: [RAZORPAY_WEBHOOK_SECRET, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID] },

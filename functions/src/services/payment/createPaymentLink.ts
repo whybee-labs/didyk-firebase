@@ -1,5 +1,5 @@
 import axios from "axios";
-import { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET } from "../../config/env";
+import { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET } from "config/env";
 
 export async function createPaymentLink(
   phone: string,

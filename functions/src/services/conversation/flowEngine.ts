@@ -1,12 +1,12 @@
 import { logger } from "firebase-functions";
-import { db } from "../../utils/firestore";
-import { ParsedMessage } from "../whatsapp/parseWebhookPayload";
-import { sendText } from "../whatsapp/sendText";
-import { callOpenAI } from "../llm/openai";
-import { getFlowConfig, UseCase } from "../../config/flows";
-import { FlowField } from "../../config/flows/types";
-import { Conversation } from "./handleIncomingMessage";
-import { sendConfirmation } from "./confirmation";
+import { db } from "utils/firestore";
+import { ParsedMessage } from "services/whatsapp/parseWebhookPayload";
+import { sendText } from "services/whatsapp/sendText";
+import { callOpenAI } from "services/llm/openai";
+import { getFlowConfig, UseCase } from "config/flows";
+import { FlowField } from "config/flows/types";
+import { Conversation } from "services/conversation/handleIncomingMessage";
+import { sendConfirmation } from "services/conversation/confirmation";
 
 export async function flowEngine(
   phone: string,

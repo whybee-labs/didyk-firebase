@@ -1,8 +1,8 @@
 import { FieldValue } from "firebase-admin/firestore";
-import { db } from "../../utils/firestore";
-import { sendButtons } from "../whatsapp/sendButtons";
-import { sendText } from "../whatsapp/sendText";
-import { getFlowConfig, UseCase } from "../../config/flows";
+import { db } from "utils/firestore";
+import { sendButtons } from "services/whatsapp/sendButtons";
+import { sendText } from "services/whatsapp/sendText";
+import { getFlowConfig, UseCase } from "config/flows";
 import { Conversation } from "./handleIncomingMessage";
 import { startFulfillment } from "./fulfillment";
 
@@ -51,7 +51,7 @@ async function resetConversation(phone: string, conversation: Conversation): Pro
     updatedAt: new Date(),
   });
 
-  const { discovery } = await import("./discovery");
+  const { discovery } = await import("services/conversation/discovery");
   await discovery(phone, { type: "text", phone, messageId: "", timestamp: "" }, {
     ...conversation,
     status: "discovery",

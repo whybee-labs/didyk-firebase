@@ -1,6 +1,6 @@
 import { FlowConfig } from "./types";
-import { generateVideo } from "../../services/generators/videoGenerator";
-import { generatePdf } from "../../services/generators/pdfGenerator";
+import { generateVideo } from "services/generators/videoGenerator";
+import { generatePdf } from "services/generators/pdfGenerator";
 
 export const eventFlow: FlowConfig = {
   id: "event",

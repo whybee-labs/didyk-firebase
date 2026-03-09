@@ -1,6 +1,6 @@
 import { FlowConfig } from "./types";
-import { generateImage } from "../../services/generators/imageGenerator";
-import { generateText } from "../../services/generators/textGenerator";
+import { generateImage } from "services/generators/imageGenerator";
+import { generateText } from "services/generators/textGenerator";
 
 export const shopFlow: FlowConfig = {
   id: "shop",

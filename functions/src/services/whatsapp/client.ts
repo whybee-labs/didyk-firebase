@@ -1,5 +1,5 @@
 import axios from "axios";
-import { WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID } from "../../config/env";
+import { WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID } from "config/env";
 
 const META_API_VERSION = "v22.0";
 

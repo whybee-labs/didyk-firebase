@@ -1,4 +1,4 @@
-import { callOpenAI } from "../llm/openai";
+import { callOpenAI } from "services/llm/openai";
 
 export async function generateText(data: Record<string, unknown>): Promise<string> {
   const system = `You are a creative writer. Write a short, warm, personalized WhatsApp message (2-4 sentences) based on the data provided.

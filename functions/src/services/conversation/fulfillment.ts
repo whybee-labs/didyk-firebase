@@ -1,14 +1,14 @@
 import { logger } from "firebase-functions";
-import { db } from "../../utils/firestore";
-import { sendText } from "../whatsapp/sendText";
-import { sendVideo } from "../whatsapp/sendVideo";
-import { sendImage } from "../whatsapp/sendImage";
-import { sendDocument } from "../whatsapp/sendDocument";
-import { sendAudio } from "../whatsapp/sendAudio";
-import { getFlowConfig, UseCase } from "../../config/flows";
-import { OutputType } from "../../config/flows/types";
-import { createPaymentLink } from "../payment/createPaymentLink";
-import { Conversation } from "./handleIncomingMessage";
+import { db } from "utils/firestore";
+import { sendText } from "services/whatsapp/sendText";
+import { sendVideo } from "services/whatsapp/sendVideo";
+import { sendImage } from "services/whatsapp/sendImage";
+import { sendDocument } from "services/whatsapp/sendDocument";
+import { sendAudio } from "services/whatsapp/sendAudio";
+import { getFlowConfig, UseCase } from "config/flows";
+import { OutputType } from "config/flows/types";
+import { createPaymentLink } from "services/payment/createPaymentLink";
+import { Conversation } from "services/conversation/handleIncomingMessage";
 
 export async function startFulfillment(phone: string, conversation: Conversation): Promise<void> {
   logger.info("Fulfillment started", { phone, conversationId: conversation.conversationId, useCase: conversation.useCase });

@@ -1,12 +1,12 @@
 import { logger } from "firebase-functions";
 import { FieldValue } from "firebase-admin/firestore";
-import { db } from "../../utils/firestore";
-import { ParsedMessage } from "../whatsapp/parseWebhookPayload";
-import { sendText } from "../whatsapp/sendText";
-import { getFlowConfig, UseCase } from "../../config/flows";
-import { discovery } from "./discovery";
-import { flowEngine } from "./flowEngine";
-import { handleConfirmation } from "./confirmation";
+import { db } from "utils/firestore";
+import { ParsedMessage } from "services/whatsapp/parseWebhookPayload";
+import { sendText } from "services/whatsapp/sendText";
+import { getFlowConfig, UseCase } from "config/flows";
+import { discovery } from "services/conversation/discovery";
+import { flowEngine } from "services/conversation/flowEngine";
+import { handleConfirmation } from "services/conversation/confirmation";
 
 export type ConversationStatus =
   | "discovery"

@@ -1,20 +1,20 @@
 import { logger } from "firebase-functions";
-import { db } from "../../utils/firestore";
-import { ParsedMessage } from "../whatsapp/parseWebhookPayload";
-import { sendButtons } from "../whatsapp/sendButtons";
-import { sendText } from "../whatsapp/sendText";
-import { sendVideo } from "../whatsapp/sendVideo";
-import { sendImage } from "../whatsapp/sendImage";
-import { sendAudio } from "../whatsapp/sendAudio";
-import { sendDocument } from "../whatsapp/sendDocument";
-import { callOpenAI } from "../llm/openai";
-import { UseCase } from "../../config/flows";
-import { Conversation } from "./handleIncomingMessage";
-import { generateVideo } from "../generators/videoGenerator";
-import { generateImage } from "../generators/imageGenerator";
-import { generateAudio } from "../generators/audioGenerator";
-import { generatePdf } from "../generators/pdfGenerator";
-import { generateText } from "../generators/textGenerator";
+import { db } from "utils/firestore";
+import { ParsedMessage } from "services/whatsapp/parseWebhookPayload";
+import { sendButtons } from "services/whatsapp/sendButtons";
+import { sendText } from "services/whatsapp/sendText";
+import { sendVideo } from "services/whatsapp/sendVideo";
+import { sendImage } from "services/whatsapp/sendImage";
+import { sendAudio } from "services/whatsapp/sendAudio";
+import { sendDocument } from "services/whatsapp/sendDocument";
+import { callOpenAI } from "services/llm/openai";
+import { UseCase } from "config/flows";
+import { Conversation } from "services/conversation/handleIncomingMessage";
+import { generateVideo } from "services/generators/videoGenerator";
+import { generateImage } from "services/generators/imageGenerator";
+import { generateAudio } from "services/generators/audioGenerator";
+import { generatePdf } from "services/generators/pdfGenerator";
+import { generateText } from "services/generators/textGenerator";
 
 const WELCOME_MESSAGE =
   "👋 Welcome to *Whybee*! I create personalised content for you.\n\nWhat would you like to make today?";
@@ -114,7 +114,7 @@ async function initiateFlow(phone: string, conversationId: string, useCase: UseC
 
   logger.info("Flow initiated (conversational)", { phone, useCase });
 
-  const { flowEngine } = await import("./flowEngine");
+  const { flowEngine } = await import("services/conversation/flowEngine");
   const syntheticConversation = {
     conversationId,
     phone,

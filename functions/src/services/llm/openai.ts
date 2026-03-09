@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { GROQ_API_KEY } from "../../config/env";
+import { GROQ_API_KEY } from "config/env";
 
 const MODEL = "llama-3.1-8b-instant";
 
