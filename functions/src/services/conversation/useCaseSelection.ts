@@ -6,6 +6,7 @@ import { getProductConfig, UseCase } from "config/products";
 import { findProduct, findUseCase } from "config/catalog";
 import { Conversation } from "services/conversation/handleIncomingMessage";
 import { sendConfirmation } from "services/conversation/confirmation";
+import { t } from "utils/t";
 
 export async function sendUseCaseSelection(phone: string, conversation: Conversation): Promise<void> {
   const config = getProductConfig(conversation.useCase as UseCase);
@@ -23,8 +24,8 @@ export async function sendUseCaseSelection(phone: string, conversation: Conversa
   await sendList(
     conversation.conversationId,
     phone,
-    `Great! Now choose what you'd like created for your ${config.name}:`,
-    "Choose",
+    t("usecase.body", { productName: config.name }),
+    t("usecase.button"),
     [
       {
         rows: useCases.map((uc) => ({
@@ -49,7 +50,7 @@ export async function handleUseCaseSelection(
 
   const uc = findUseCase(message.listId);
   if (!uc) {
-    await sendText(conversation.conversationId, phone, "Something went wrong. Please try again.");
+    await sendText(conversation.conversationId, phone, t("errors.generic"));
     await sendUseCaseSelection(phone, conversation);
     return;
   }

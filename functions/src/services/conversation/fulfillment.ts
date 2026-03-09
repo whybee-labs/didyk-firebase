@@ -10,6 +10,7 @@ import { OutputType } from "config/products/types";
 import { findUseCase } from "config/catalog";
 import { createPaymentLink } from "services/payment/createPaymentLink";
 import { Conversation } from "services/conversation/handleIncomingMessage";
+import { t } from "utils/t";
 
 export async function startFulfillment(phone: string, conversation: Conversation): Promise<void> {
   logger.info("Fulfillment started", { phone, conversationId: conversation.conversationId, useCase: conversation.useCase });
@@ -22,7 +23,7 @@ export async function startFulfillment(phone: string, conversation: Conversation
   const config = getProductConfig(conversation.useCase as UseCase);
   const cid = conversation.conversationId;
 
-  await sendText(cid, phone, "🎬 Here's your preview!");
+  await sendText(cid, phone, t("fulfillment.preview"));
 
   // Generate and send outputs for each selected use case
   for (const ucId of conversation.selectedUseCaseIds ?? []) {
@@ -42,7 +43,7 @@ export async function startFulfillment(phone: string, conversation: Conversation
     `Whybee ${config.name}`
   );
 
-  await sendText(cid, phone, `💳 To receive your final files, please complete payment:\n${shortUrl}`);
+  await sendText(cid, phone, t("fulfillment.payment", { url: shortUrl }));
 
   await db.collection("conversations").doc(cid).update({
     status: "awaiting_payment",

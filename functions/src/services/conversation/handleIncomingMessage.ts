@@ -8,6 +8,7 @@ import { discovery } from "services/conversation/discovery";
 import { flowEngine } from "services/conversation/flowEngine";
 import { handleConfirmation } from "services/conversation/confirmation";
 import { handleUseCaseSelection } from "services/conversation/useCaseSelection";
+import { t } from "utils/t";
 
 export type ConversationStatus =
   | "discovery"
@@ -118,11 +119,11 @@ export async function handleIncomingMessage(
       break;
 
     case "generating":
-      await sendText(conversation.conversationId, phone, "⏳ Still working on it, hang tight!");
+      await sendText(conversation.conversationId, phone, t("status.generating"));
       break;
 
     case "awaiting_payment":
-      await sendText(conversation.conversationId, phone, "💳 Please complete your payment using the link sent above.");
+      await sendText(conversation.conversationId, phone, t("status.awaitingPayment"));
       break;
 
     default:
@@ -136,7 +137,7 @@ async function handleFormReply(
   conversation: Conversation
 ): Promise<void> {
   if (message.type !== "form_reply" || !message.formData) {
-    await sendText(conversation.conversationId, phone, "Please complete the form first, then we can continue! 📋");
+    await sendText(conversation.conversationId, phone, t("form.required"));
     return;
   }
 

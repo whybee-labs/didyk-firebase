@@ -3,6 +3,7 @@ import { db } from "utils/firestore";
 import { sendButtons } from "services/whatsapp/sendButtons";
 import { sendText } from "services/whatsapp/sendText";
 import { getProductConfig, UseCase } from "config/products";
+import { t } from "utils/t";
 import { Conversation } from "./handleIncomingMessage";
 import { startFulfillment } from "./fulfillment";
 
@@ -16,8 +17,8 @@ export async function sendConfirmation(phone: string, conversation: Conversation
   });
 
   await sendButtons(conversation.conversationId, phone, summary, [
-    { id: "create", title: "✅ Create it!" },
-    { id: "restart", title: "🔄 Start Over" },
+    { id: "create", title: t("confirm.createButton") },
+    { id: "restart", title: t("confirm.restartButton") },
   ]);
 }
 
@@ -27,7 +28,7 @@ export async function handleConfirmation(
   conversation: Conversation
 ): Promise<void> {
   if (message.type !== "button_reply") {
-    await sendText(conversation.conversationId, phone, "Tap one of the buttons above to continue.");
+    await sendText(conversation.conversationId, phone, t("confirm.nudge"));
     return;
   }
 

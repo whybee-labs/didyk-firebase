@@ -6,9 +6,7 @@ import { sendList } from "services/whatsapp/sendList";
 import { catalog, findProduct, popularProducts } from "config/catalog";
 import { UseCase } from "config/products";
 import { Conversation } from "services/conversation/handleIncomingMessage";
-
-const WELCOME_BODY =
-  "👋 Welcome to *Whybee*! I create personalised content for you.\n\nHere are some popular options — or browse the full catalog below 👇";
+import { t } from "utils/t";
 
 export async function discovery(
   phone: string,
@@ -54,12 +52,12 @@ async function sendWelcome(conversationId: string, phone: string): Promise<void>
   const popular = popularProducts();
 
   // Message 1: popular product quick-pick buttons
-  await sendButtons(conversationId, phone, WELCOME_BODY,
+  await sendButtons(conversationId, phone, t("welcome.body"),
     popular.map((p) => ({ id: p.id, title: p.label }))
   );
 
   // Message 2: full category browse list
-  await sendList(conversationId, phone, "📂 Browse all categories:", "Browse All", [
+  await sendList(conversationId, phone, t("welcome.browseAll.body"), t("welcome.browseAll.button"), [
     {
       rows: catalog.map((c) => ({
         id: c.id,

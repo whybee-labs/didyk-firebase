@@ -7,6 +7,7 @@ import { getProductConfig, UseCase } from "config/products";
 import { ProductField } from "config/products/types";
 import { Conversation } from "services/conversation/handleIncomingMessage";
 import { sendUseCaseSelection } from "services/conversation/useCaseSelection";
+import { t } from "utils/t";
 
 async function onFormComplete(phone: string, conversation: Conversation): Promise<void> {
   await sendUseCaseSelection(phone, conversation);
@@ -35,11 +36,9 @@ export async function flowEngine(
 
       const maxImages = 3;
       if (updated.length < maxImages) {
-        const msg = `Got it! (${updated.length}/${maxImages}) Send more photos or type *done* when ready.`;
-        await sendText(conversation.conversationId, phone, msg);
+        await sendText(conversation.conversationId, phone, t("form.photo.progress", { current: updated.length, max: maxImages }));
       } else {
-        const msg = "Perfect, that's all the photos we need!";
-        await sendText(conversation.conversationId, phone, msg);
+        await sendText(conversation.conversationId, phone, t("form.photo.done"));
       }
     }
 
@@ -56,8 +55,7 @@ export async function flowEngine(
     if (mediaField) {
       const images = (collectedData[mediaField.key] as string[] | undefined) ?? [];
       if (mediaField.required && images.length === 0) {
-        const msg = "Please send at least one photo first.";
-        await sendText(conversation.conversationId, phone, msg);
+        await sendText(conversation.conversationId, phone, t("form.photo.required"));
         return;
       }
     }
@@ -96,8 +94,7 @@ export async function flowEngine(
   // Fallback — ask for next missing field
   const nextField = getNextMissingField(config.fields, collectedData);
   if (nextField) {
-    const msg = `Please share: ${nextField.label}`;
-    await sendText(conversation.conversationId, phone, msg);
+    await sendText(conversation.conversationId, phone, t("form.field.ask", { label: nextField.label }));
   }
 }
 

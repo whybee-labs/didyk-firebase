@@ -1,0 +1,31 @@
+{
+  "welcome.body": "👋 Welcome to *Whybee*! I create personalised content for you.\n\nHere are some popular options — or browse the full catalog below 👇",
+  "welcome.browseAll.body": "📂 Browse all categories:",
+  "welcome.browseAll.button": "Browse All",
+
+  "browse.category.header": "📂 *{label}*\nChoose a product:",
+  "browse.category.button": "Browse",
+  "browse.product.header": "📦 *{label}*\nWhat would you like created?",
+  "browse.product.button": "Choose",
+
+  "usecase.body": "Great! Now choose what you'd like created for your {productName}:",
+  "usecase.button": "Choose",
+
+  "confirm.createButton": "✅ Create it!",
+  "confirm.restartButton": "🔄 Start Over",
+  "confirm.nudge": "Tap one of the buttons above to continue.",
+
+  "form.required": "Please complete the form first, then we can continue! 📋",
+  "form.photo.progress": "Got it! ({current}/{max}) Send more photos or type *done* when ready.",
+  "form.photo.done": "Perfect, that's all the photos we need!",
+  "form.photo.required": "Please send at least one photo first.",
+  "form.field.ask": "Please share: {label}",
+
+  "fulfillment.preview": "🎬 Here's your preview!",
+  "fulfillment.payment": "💳 To receive your final files, please complete payment:\n{url}",
+
+  "status.generating": "⏳ Still working on it, hang tight!",
+  "status.awaitingPayment": "💳 Please complete your payment using the link sent above.",
+
+  "errors.generic": "Something went wrong. Please try again."
+}

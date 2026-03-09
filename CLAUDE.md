@@ -14,13 +14,17 @@ functions/src/
   api/              # Firebase Function entry points
   config/
     env.ts          # Firebase secrets (GROQ_API_KEY, WHATSAPP_*, RAZORPAY_*)
-    flows/          # Per-flow config (birthday, shop, event)
+    products/       # Per-product config (birthday, business, event) + types
+    catalog/        # Full product catalog hierarchy (categories → products → use cases)
+    translations.json  # All user-facing copy — edit here for content changes
+  utils/
+    t.ts            # t(key, vars?) — reads from translations.json with {var} substitution
   services/
-    conversation/   # State machine: discovery → refining → confirming → generating → awaiting_payment
+    conversation/   # State machine: discovery → browsing → refining → selecting_usecases → confirming → generating → awaiting_payment
     generators/     # Output stubs: video, image, pdf, audio, text
     llm/            # callOpenAI() — wraps Groq via OpenAI SDK
     payments/       # Razorpay createPaymentLink
-    whatsapp/       # Senders (text, video, image, audio, document, buttons) + webhook parser
+    whatsapp/       # Senders (text, video, image, audio, document, buttons, list) + webhook parser
 docs/               # Architecture docs — keep updated when business logic changes
 ```
 
@@ -29,6 +33,12 @@ docs/               # Architecture docs — keep updated when business logic cha
 - Never use relative imports with `../` — always use absolute paths from `src/`
 - Deploy: `firebase deploy --only functions` (predeploy build runs automatically)
 - Never mention "video creation" in user-facing copy — use "content" instead
+
+## Copy / Translations Rule
+- **All user-facing strings must live in `config/translations.json`** — never hardcode copy in service files
+- Use `t("key")` or `t("key", { var: value })` from `utils/t` to read strings
+- Placeholders use `{varName}` syntax in the JSON, substituted at runtime via `t()`
+- This keeps all copy in one place and enables future multi-language support
 
 ## Docs Rule
 **Whenever business logic is changed** (conversation states, flow configs, payment flow, media generation, WhatsApp integration), update the relevant file in `docs/`. The docs are:
