@@ -5,6 +5,7 @@ import { generateText } from "services/generators/textGenerator";
 export const shopFlow: FlowConfig = {
   id: "shop",
   name: "Shop Promo",
+  buttonTitle: "🛍 Shop Promo",
   description: "A promotional video for a shop or business",
   waFlowId: "SHOP_FLOW_ID_PLACEHOLDER",
   fields: [

@@ -1,4 +1,5 @@
 import { sendWhatsAppRequest } from "./client";
+import { logOutbound } from "utils/messageLog";
 
 export interface Button {
   id: string;
@@ -6,6 +7,7 @@ export interface Button {
 }
 
 export async function sendButtons(
+  conversationId: string,
   phone: string,
   bodyText: string,
   buttons: Button[]
@@ -25,4 +27,5 @@ export async function sendButtons(
       },
     },
   });
+  logOutbound(conversationId, "buttons", bodyText);
 }

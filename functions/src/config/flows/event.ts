@@ -5,6 +5,7 @@ import { generatePdf } from "services/generators/pdfGenerator";
 export const eventFlow: FlowConfig = {
   id: "event",
   name: "Event Invite",
+  buttonTitle: "🎉 Event Invite",
   description: "An invitation video for an event, party, or gathering",
   waFlowId: "EVENT_FLOW_ID_PLACEHOLDER",
   fields: [

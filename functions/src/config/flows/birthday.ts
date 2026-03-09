@@ -5,6 +5,7 @@ import { generateText } from "services/generators/textGenerator";
 export const birthdayFlow: FlowConfig = {
   id: "birthday",
   name: "Birthday Video",
+  buttonTitle: "🎂 Birthday",
   description: "A personalised birthday video for someone special",
   waFlowId: "BIRTHDAY_FLOW_ID_PLACEHOLDER",
   fields: [

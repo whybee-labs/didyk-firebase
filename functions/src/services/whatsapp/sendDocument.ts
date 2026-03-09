@@ -1,6 +1,8 @@
 import { sendWhatsAppRequest } from "./client";
+import { logOutbound } from "utils/messageLog";
 
 export async function sendDocument(
+  conversationId: string,
   phone: string,
   documentUrl: string,
   filename: string
@@ -11,4 +13,5 @@ export async function sendDocument(
     type: "document",
     document: { link: documentUrl, filename },
   });
+  logOutbound(conversationId, "document", documentUrl);
 }

@@ -15,7 +15,7 @@ export async function sendConfirmation(phone: string, conversation: Conversation
     updatedAt: new Date(),
   });
 
-  await sendButtons(phone, summary, [
+  await sendButtons(conversation.conversationId, phone, summary, [
     { id: "create", title: "✅ Create it!" },
     { id: "restart", title: "🔄 Start Over" },
   ]);
@@ -27,7 +27,7 @@ export async function handleConfirmation(
   conversation: Conversation
 ): Promise<void> {
   if (message.type !== "button_reply") {
-    await sendText(phone, "Tap one of the buttons above to continue.");
+    await sendText(conversation.conversationId, phone, "Tap one of the buttons above to continue.");
     return;
   }
 

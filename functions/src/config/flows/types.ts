@@ -18,6 +18,7 @@ export interface FlowOutput {
 export interface FlowConfig {
   id: "birthday" | "shop" | "event";
   name: string;
+  buttonTitle: string;                                         // shown on WhatsApp discovery button
   description: string;                                         // used in discovery intent detection
   waFlowId: string;                                            // Meta WhatsApp Flow ID (placeholder)
   fields: FlowField[];

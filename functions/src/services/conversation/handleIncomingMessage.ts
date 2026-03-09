@@ -94,11 +94,11 @@ export async function handleIncomingMessage(
       break;
 
     case "generating":
-      await sendText(phone, "⏳ Still working on it, hang tight!");
+      await sendText(conversation.conversationId, phone, "⏳ Still working on it, hang tight!");
       break;
 
     case "awaiting_payment":
-      await sendText(phone, "💳 Please complete your payment using the link sent above.");
+      await sendText(conversation.conversationId, phone, "💳 Please complete your payment using the link sent above.");
       break;
 
     default:
@@ -112,7 +112,7 @@ async function handleFormReply(
   conversation: Conversation
 ): Promise<void> {
   if (message.type !== "form_reply" || !message.formData) {
-    await sendText(phone, "Please complete the form first, then we can continue! 📋");
+    await sendText(conversation.conversationId, phone, "Please complete the form first, then we can continue! 📋");
     return;
   }
 

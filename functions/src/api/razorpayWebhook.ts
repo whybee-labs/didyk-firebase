@@ -70,7 +70,7 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
     updatedAt: new Date(),
   });
 
-  await sendText(phone, "✅ Payment received! Your video will be delivered shortly.");
+  await sendText(conversationId, phone, "✅ Payment received! Your content will be delivered shortly.");
 
   logger.info("Payment confirmed", { conversationId, phone });
 }

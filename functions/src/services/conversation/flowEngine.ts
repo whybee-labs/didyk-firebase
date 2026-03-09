@@ -31,12 +31,11 @@ export async function flowEngine(
 
       const maxImages = 3;
       if (updated.length < maxImages) {
-        await sendText(
-          phone,
-          `Got it! (${updated.length}/${maxImages}) Send more photos or type *done* when ready.`
-        );
+        const msg = `Got it! (${updated.length}/${maxImages}) Send more photos or type *done* when ready.`;
+        await sendText(conversation.conversationId, phone, msg);
       } else {
-        await sendText(phone, "Perfect, that's all the photos we need!");
+        const msg = "Perfect, that's all the photos we need!";
+        await sendText(conversation.conversationId, phone, msg);
       }
     }
 
@@ -53,7 +52,8 @@ export async function flowEngine(
     if (mediaField) {
       const images = (collectedData[mediaField.key] as string[] | undefined) ?? [];
       if (mediaField.required && images.length === 0) {
-        await sendText(phone, "Please send at least one photo first.");
+        const msg = "Please send at least one photo first.";
+        await sendText(conversation.conversationId, phone, msg);
         return;
       }
     }
@@ -84,7 +84,7 @@ export async function flowEngine(
     }
 
     if (result.nextQuestion) {
-      await sendText(phone, result.nextQuestion);
+      await sendText(conversation.conversationId, phone, result.nextQuestion);
     }
     return;
   }
@@ -92,7 +92,8 @@ export async function flowEngine(
   // Fallback — ask for next missing field
   const nextField = getNextMissingField(config.fields, collectedData);
   if (nextField) {
-    await sendText(phone, `Please share: ${nextField.label}`);
+    const msg = `Please share: ${nextField.label}`;
+    await sendText(conversation.conversationId, phone, msg);
   }
 }
 
