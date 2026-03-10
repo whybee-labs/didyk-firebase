@@ -53,18 +53,25 @@ export const razorpayWebhook = onRequest(
 
 async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<void> {
   const entity = (body as any)?.payload?.payment_link?.entity;
-  const conversationId = entity?.reference_id as string | undefined;
+  const paymentLinkId = entity?.id as string | undefined;
 
-  if (!conversationId) {
-    logger.warn("payment_link.paid missing reference_id", { entity });
+  if (!paymentLinkId) {
+    logger.warn("payment_link.paid missing payment link id", { entity });
     return;
   }
 
-  const convSnap = await db.collection("conversations").doc(conversationId).get();
-  if (!convSnap.exists) {
-    logger.warn("Conversation not found for payment", { conversationId });
+  const convQuery = await db.collection("conversations")
+    .where("paymentData.linkId", "==", paymentLinkId)
+    .limit(1)
+    .get();
+
+  if (convQuery.empty) {
+    logger.warn("Conversation not found for payment link", { paymentLinkId });
     return;
   }
+
+  const convSnap = convQuery.docs[0];
+  const conversationId = convSnap.id;
 
   const phone = convSnap.data()?.phone as string;
 
@@ -75,6 +82,7 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
 
   await db.collection("conversations").doc(conversationId).update({
     status: "completed",
+    "paymentData.paidAt": new Date(),
     updatedAt: new Date(),
   });
 

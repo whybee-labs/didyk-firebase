@@ -35,6 +35,12 @@ export interface Conversation {
   collectedData: Record<string, unknown>;
   browsePath?: string[];
   selectedUseCaseIds?: string[];
+  paymentData?: {
+    linkId: string;
+    amount: number; // INR
+    createdAt: Date;
+    paidAt?: Date;
+  };
   messageHistory?: HistoryEntry[];
   lastMessageAt: Date;
   createdAt: Date;

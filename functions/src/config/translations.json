@@ -22,15 +22,11 @@
   "form.field.ask": "Please share: {label}",
 
   "fulfillment.preview": "🎬 Here's your preview!",
-  "fulfillment.payment": "💳 To receive your final files, please complete payment:\n{url}",
+  "fulfillment.payment": "💳 To receive your final files, please complete payment:",
+  "fulfillment.paymentButton": "Complete Payment",
   "fulfillment.delivering": "✅ Payment confirmed! Here's your content:",
 
-  "test.paymentBody": "🧪 *Test payment flow* — tap below to pay ₹1 and receive a stub video.",
-  "test.paymentButton": "Pay ₹1 (Test)",
-  "test.welcomeBody": "🧪 Test the full payment flow:",
-  "test.welcomeButton": "Test Payment",
-
-  "status.generating": "⏳ Still working on it, hang tight!",
+"status.generating": "⏳ Still working on it, hang tight!",
   "status.awaitingPayment": "💳 Please complete your payment using the link sent above.",
 
   "errors.generic": "Something went wrong. Please try again."

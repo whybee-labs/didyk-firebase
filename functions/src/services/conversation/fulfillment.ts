@@ -1,6 +1,7 @@
 import { logger } from "firebase-functions";
 import { db } from "utils/firestore";
 import { sendText } from "services/whatsapp/sendText";
+import { sendCTAButton } from "services/whatsapp/sendCTAButton";
 import { sendVideo } from "services/whatsapp/sendVideo";
 import { sendImage } from "services/whatsapp/sendImage";
 import { sendDocument } from "services/whatsapp/sendDocument";
@@ -43,11 +44,11 @@ export async function startFulfillment(phone: string, conversation: Conversation
     `Whybee ${config.name}`
   );
 
-  await sendText(cid, phone, t("fulfillment.payment", { url: shortUrl }));
+  await sendCTAButton(cid, phone, t("fulfillment.payment"), t("fulfillment.paymentButton"), shortUrl);
 
   await db.collection("conversations").doc(cid).update({
     status: "awaiting_payment",
-    "collectedData.paymentLinkId": id,
+    paymentData: { linkId: id, amount: config.pricing.amount, createdAt: new Date() },
     updatedAt: new Date(),
   });
 }

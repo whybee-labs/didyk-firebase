@@ -21,7 +21,7 @@ export async function createPaymentLink(
     currency: "INR",
     description,
     customer: { contact: phone },
-    reference_id: conversationId,
+    reference_id: `${conversationId}-${Date.now()}`,
     notify: { sms: false, email: false },
     reminder_enable: false,
   });

@@ -3,11 +3,9 @@ import { db } from "utils/firestore";
 import { ParsedMessage } from "services/whatsapp/parseWebhookPayload";
 import { sendButtons } from "services/whatsapp/sendButtons";
 import { sendList } from "services/whatsapp/sendList";
-import { sendCTAButton } from "services/whatsapp/sendCTAButton";
 import { catalog, findProduct, popularProducts } from "config/catalog";
 import { UseCase } from "config/products";
 import { Conversation } from "services/conversation/handleIncomingMessage";
-import { createPaymentLink } from "services/payment/createPaymentLink";
 import { t } from "utils/t";
 
 export async function discovery(
@@ -16,18 +14,6 @@ export async function discovery(
   conversation: Conversation
 ): Promise<void> {
   const cid = conversation.conversationId;
-
-  // Test payment button tapped — create a ₹1 Razorpay link and send CTA button
-  if (message.type === "button_reply" && message.buttonId === "test-payment") {
-    const { id, shortUrl } = await createPaymentLink(phone, cid, 1, "Whybee Test");
-    await db.collection("conversations").doc(cid).update({
-      status: "awaiting_payment",
-      "collectedData.paymentLinkId": id,
-      updatedAt: new Date(),
-    });
-    await sendCTAButton(cid, phone, t("test.paymentBody"), t("test.paymentButton"), shortUrl);
-    return;
-  }
 
   // Popular product button tapped — go straight to form, no browsing step
   if (message.type === "button_reply" && message.buttonId?.startsWith("prod-")) {
@@ -81,10 +67,6 @@ async function sendWelcome(conversationId: string, phone: string): Promise<void>
     },
   ]);
 
-  // Message 3: test payment button
-  await sendButtons(conversationId, phone, t("test.welcomeBody"), [
-    { id: "test-payment", title: t("test.welcomeButton") },
-  ]);
 }
 
 export async function initiateFlow(
