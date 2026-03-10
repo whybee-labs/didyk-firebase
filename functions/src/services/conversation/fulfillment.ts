@@ -36,19 +36,18 @@ export async function startFulfillment(phone: string, conversation: Conversation
     }
   }
 
+  // Detect currency from phone country code (+91 = India = INR, everything else = USD)
+  const currency = phone.startsWith("91") ? "INR" : "USD";
+  const amount = config.pricing[currency];
+
   // Create Razorpay payment link and send to user
-  const { id, shortUrl } = await createPaymentLink(
-    phone,
-    cid,
-    config.pricing.amount,
-    `Whybee ${config.name}`
-  );
+  const { id, shortUrl } = await createPaymentLink(phone, cid, amount, `Whybee ${config.name}`, currency);
 
   await sendCTAButton(cid, phone, t("fulfillment.payment"), t("fulfillment.paymentButton"), shortUrl);
 
   await db.collection("conversations").doc(cid).update({
     status: "awaiting_payment",
-    paymentData: { linkId: id, amount: config.pricing.amount, createdAt: new Date() },
+    paymentData: { linkId: id, amount, currency, createdAt: new Date() },
     updatedAt: new Date(),
   });
 }

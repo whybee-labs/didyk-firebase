@@ -52,5 +52,5 @@ export const businessProduct: ProductConfig = {
       "Does this look right?",
     ].join("\n");
   },
-  pricing: { amount: 299, currency: "INR" },
+  pricing: { INR: 299, USD: 7 },
 };

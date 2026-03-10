@@ -55,5 +55,5 @@ export const eventProduct: ProductConfig = {
       "Does this look right?",
     ].join("\n");
   },
-  pricing: { amount: 249, currency: "INR" },
+  pricing: { INR: 249, USD: 6 },
 };

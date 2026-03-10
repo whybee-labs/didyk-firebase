@@ -52,5 +52,5 @@ export const birthdayProduct: ProductConfig = {
       "Does this look right?",
     ].join("\n");
   },
-  pricing: { amount: 199, currency: "INR" },
+  pricing: { INR: 199, USD: 5 },
 };

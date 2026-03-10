@@ -11,14 +11,15 @@ function getClient(): Razorpay {
 export async function createPaymentLink(
   phone: string,
   conversationId: string,
-  amount: number, // in INR
-  description: string
+  amount: number, // in major currency unit (INR or USD)
+  description: string,
+  currency: "INR" | "USD" = "INR"
 ): Promise<{ id: string; shortUrl: string }> {
   const client = getClient();
 
   const link = await client.paymentLink.create({
-    amount: amount * 100, // convert to paise
-    currency: "INR",
+    amount: amount * 100, // convert to smallest unit (paise / cents)
+    currency,
     description,
     customer: { contact: phone },
     reference_id: `${conversationId}-${Date.now()}`,

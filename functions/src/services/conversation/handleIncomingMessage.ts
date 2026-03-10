@@ -37,7 +37,8 @@ export interface Conversation {
   selectedUseCaseIds?: string[];
   paymentData?: {
     linkId: string;
-    amount: number; // INR
+    amount: number;
+    currency: "INR" | "USD";
     createdAt: Date;
     paidAt?: Date;
   };

@@ -30,5 +30,5 @@ export interface ProductConfig {
   fields: ProductField[];
   useCases: CatalogUseCase[];
   confirmationTemplate: (data: Record<string, unknown>) => string;
-  pricing: { amount: number; currency: "INR" };                // amount in INR
+  pricing: { INR: number; USD: number };
 }
