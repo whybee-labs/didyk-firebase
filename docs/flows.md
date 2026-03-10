@@ -1,34 +1,81 @@
-# Flow Configuration
+# Products & Catalog
 
-Flows are the core abstraction that defines everything about a use case — what data to collect, how to collect it, what to output, and what to charge.
+Products are the core abstraction that defines what data to collect, what to charge, and how to deliver output.
 
 ---
 
-## FlowConfig Schema
+## Catalog Hierarchy
 
-**File:** `config/flows/types.ts`
+Three levels, always strict:
+
+```
+CatalogCategory  (e.g. Memories)
+  └── CatalogProduct  (e.g. Birthdays)           ← browsable node
+       └── CatalogUseCase  (e.g. Birthday Video)  ← leaf; drives output generation
+```
+
+**File:** `config/catalog/`
+
+- `catalog: CatalogCategory[]` — full 5-category tree (Memories, Invitations, Business, Social Media, Documents)
+- `popularProducts()` — the 3 products marked `popular: true` (shown as welcome buttons)
+- Lookups: `findCategory(id)`, `findProduct(id)`, `findUseCase(id)`
+
+**Types** (`config/catalog/types.ts` + `config/products/types.ts`):
 
 ```ts
-interface FlowConfig {
-  id: "birthday" | "shop" | "event";
-  name: string;           // human-readable, used in messages and payment description
-  description: string;    // used in LLM intent detection prompt
-  waFlowId: string;       // Meta WhatsApp Flow ID (set in Meta dashboard)
-  fields: FlowField[];    // what data to collect
-  outputs: FlowOutput[];  // what to generate and send after confirmation
-  confirmationTemplate: (data: Record<string, unknown>) => string;
-  pricing: { amount: number; currency: "INR" };  // amount in INR
+interface CatalogCategory {
+  id: string;           // "cat-memories", "cat-business", etc.
+  label: string;
+  description: string;
+  products: CatalogProduct[];
+}
+
+interface CatalogProduct {
+  id: string;           // "prod-birthdays", "prod-events", etc.
+  label: string;
+  description: string;
+  popular?: boolean;            // top 3 → shown as welcome quick-reply buttons
+  productConfigId?: UseCase;    // links to ProductConfig; absent = coming soon
+  useCases: CatalogUseCase[];
+}
+
+interface CatalogUseCase {
+  id: string;           // "uc-birthday-video", "uc-party-invite", etc.
+  label: string;
+  description: string;
+  outputs: UseCaseOutput[];     // what gets generated & sent at fulfillment
 }
 ```
 
 ---
 
-## FlowField
+## ProductConfig Schema
+
+**File:** `config/products/types.ts`
+
+```ts
+interface ProductConfig {
+  id: "birthday" | "business" | "event";
+  name: string;           // human-readable, used in messages and payment description
+  description: string;    // used in LLM prompts
+  waFlowId: string;       // Meta WhatsApp Flow ID (set in Meta dashboard)
+  fields: ProductField[]; // what data to collect
+  useCases: CatalogUseCase[]; // canonical use cases for this product
+  confirmationTemplate: (data: Record<string, unknown>) => string;
+  pricing: { amount: number; currency: "INR" };  // amount in INR
+}
+```
+
+**Note:** `outputs` are now on `CatalogUseCase`, not `ProductConfig`. Fulfillment iterates `selectedUseCaseIds`, looks up each `CatalogUseCase` via `findUseCase(id)`, and generates its outputs.
+
+---
+
+## ProductField
 
 Defines a single data point to collect from the user.
 
 ```ts
-interface FlowField {
+interface ProductField {
   key: string;        // key in collectedData (e.g. "recipientName")
   type: "text" | "media";
   required: boolean;
@@ -43,14 +90,14 @@ interface FlowField {
 
 ---
 
-## FlowOutput
+## UseCaseOutput
 
 Defines one piece of output to generate and send to the user at fulfillment.
 
 ```ts
 type OutputType = "video" | "image" | "pdf" | "audio" | "text";
 
-interface FlowOutput {
+interface UseCaseOutput {
   type: OutputType;
   generate: (data: Record<string, unknown>) => Promise<string>;
   // Returns: URL (for video/image/pdf/audio) or message string (for text)
@@ -61,9 +108,9 @@ Outputs are sent **in order** — put media before text.
 
 ---
 
-## Current Flows
+## Current Products
 
-### Birthday (`config/flows/birthday.ts`)
+### Birthday (`config/products/birthday.ts`)
 
 | Field | Type | Via | Label |
 |-------|------|-----|-------|
@@ -71,25 +118,19 @@ Outputs are sent **in order** — put media before text.
 | `birthdayMessage` | text | Form | Birthday message or wishes |
 | `images` | media | LLM | Photos of the birthday person (1–3) |
 
-**Outputs:** video → text (personalized message via OpenAI)
 **Price:** ₹199
 
----
-
-### Shop Promo (`config/flows/shop.ts`)
+### Business Promos (`config/products/business.ts`)
 
 | Field | Type | Via | Label |
 |-------|------|-----|-------|
-| `shopName` | text | Form | Shop name |
+| `shopName` | text | Form | Shop / business name |
 | `description` | text | Form | Promotion description |
 | `images` | media | LLM | Product or logo photos (1–3) |
 
-**Outputs:** image → text (promo caption via OpenAI)
 **Price:** ₹299
 
----
-
-### Event Invite (`config/flows/event.ts`)
+### Event (`config/products/event.ts`)
 
 | Field | Type | Via | Label |
 |-------|------|-----|-------|
@@ -98,31 +139,42 @@ Outputs are sent **in order** — put media before text.
 | `venue` | text | Form | Venue or location |
 | `images` | media | LLM | Photos or banner (optional) |
 
-**Outputs:** video → pdf (event flyer)
 **Price:** ₹249
 
 ---
 
-## Adding a New Flow
+## Catalog: Popular Products
 
-1. **Create** `config/flows/yourflow.ts` — implement `FlowConfig`
-2. **Add** to `config/flows/index.ts` — add to the `flows` map and `UseCase` type
-3. **Add** discovery button in `services/conversation/discovery.ts` — add button + intent detection
+These products appear as quick-reply buttons on the welcome screen (bypass category browsing):
+
+| id | label |
+|----|-------|
+| `prod-birthdays` | 🎂 Birthdays |
+| `prod-business-promos` | 🛍️ Business Promos |
+| `prod-events` | 🎉 Events |
+
+---
+
+## Adding a New Product
+
+1. **Create** `config/products/yourproduct.ts` — implement `ProductConfig`
+2. **Add** to `config/products/index.ts` — add to `productMap` and `UseCase` type
+3. **Add catalog entries** in `config/catalog/index.ts` — add to the relevant `CatalogCategory.products` array with appropriate `CatalogUseCase[]`
 4. **Create WhatsApp Form** in Meta dashboard → paste the Flow ID into `waFlowId`
-5. Generators are shared — reuse existing ones or create new ones in `services/generators/`
+5. Generators are shared — reuse existing ones in `services/generators/`
 
 ---
 
 ## WhatsApp Forms
 
-Each flow sends a WhatsApp Form (nfm_reply) to collect text fields in one shot.
+Each product sends a WhatsApp Form (nfm_reply) to collect text fields in one shot.
 The `waFlowId` must be a real Flow ID from the Meta dashboard.
 
 Current placeholders:
 - `BIRTHDAY_FLOW_ID_PLACEHOLDER`
-- `SHOP_FLOW_ID_PLACEHOLDER`
+- `BUSINESS_FLOW_ID_PLACEHOLDER`
 - `EVENT_FLOW_ID_PLACEHOLDER`
 
 Replace these once Forms are created in Meta.
 
-The form's field names must match the `formKey` values in the flow's `fields` array.
+The form's field names must match the `formKey` values in the product's `fields` array.

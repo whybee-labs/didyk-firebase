@@ -19,13 +19,16 @@ lastSeenAt           Timestamp
 
 **`conversations/{conversationId}`** — Firestore auto-generated ID (not stored as a field)
 ```
-phone          string
-status         ConversationStatus
-useCase        "birthday" | "shop" | "event" | undefined
-collectedData  Record<string, unknown>   — all collected fields + paymentLinkId
-lastMessageAt  Timestamp  — updated on every incoming message (used for idle timeout)
-createdAt      Timestamp
-updatedAt      Timestamp
+phone                string
+status               ConversationStatus
+useCase              "birthday" | "business" | "event" | undefined
+collectedData        Record<string, unknown>   — user-provided form inputs + media IDs
+browsePath           string[]                  — navigation trail (e.g. ["cat-memories", "prod-birthdays"])
+selectedUseCaseIds   string[]                  — use case IDs chosen at selecting_usecases step
+paymentData          { linkId, amount, createdAt, paidAt? } — set during fulfillment
+lastMessageAt        Timestamp  — updated on every incoming message (used for idle timeout)
+createdAt            Timestamp
+updatedAt            Timestamp
 ```
 
 **`conversations/{conversationId}/messages/{messageId}`** — subcollection, appended on every message (fire-and-forget)
@@ -36,27 +39,31 @@ updatedAt      Timestamp
 
 ```
             ┌──────────────┐
-  new user  │   discovery  │
+  new user  │   discovery  │  ← welcome: popular buttons + browse list
             └──────┬───────┘
-                   │ button tap or LLM detects intent
+                   │ popular product button tapped, or category selected from list
             ┌──────▼───────┐
-            │  form_sent   │ ← WhatsApp Form sent, waiting for nfm_reply
+            │   browsing   │  ← navigating catalog: category → product → use case
             └──────┬───────┘
-                   │ form submitted
+                   │ product selected
             ┌──────▼───────┐
-            │   refining   │ ← LLM filling remaining fields conversationally
+            │   refining   │  ← LLM collecting fields conversationally (photos, text)
             └──────┬───────┘
                    │ all fields complete
+            ┌──────▼────────────┐
+            │ selecting_usecases│  ← "What would you like created?" list
+            └──────┬────────────┘
+                   │ use case selected
             ┌──────▼───────┐
-            │  confirming  │ ← summary + [Create it!] [Start Over] buttons
+            │  confirming  │  ← summary + [✅ Create it!] [🔄 Start Over] buttons
             └──────┬───────┘
                    │ "Create it!" tapped
             ┌──────▼───────┐
-            │  generating  │ ← brief state during output generation
+            │  generating  │  ← brief state during output generation
             └──────┬───────┘
                    │ all outputs sent + payment link created
             ┌──────▼──────────┐
-            │ awaiting_payment │ ← waiting for Razorpay payment
+            │ awaiting_payment │  ← CTA button sent, waiting for Razorpay payment
             └──────┬──────────┘
                    │ payment_link.paid webhook received
             ┌──────▼───────┐
@@ -64,8 +71,12 @@ updatedAt      Timestamp
             └──────────────┘
 
 "Start Over" at confirming → resets the same conversation doc back to discovery
-(status, useCase, collectedData cleared — no new document created)
+(status, useCase, collectedData, browsePath, selectedUseCaseIds cleared — no new document created)
+
+"hi" at any status → same reset (clears all fields, sends welcome again)
 ```
+
+Note: `form_sent` is a legacy status for WhatsApp Form (nfm_reply) submissions. Not triggered by the current catalog flow.
 
 ---
 
@@ -73,24 +84,28 @@ updatedAt      Timestamp
 
 `handleIncomingMessage.ts` is the entry point for every message.
 
-1. **Load conversation** — look up `users/{phone}` → get `activeConversationId` → load `conversations/{activeConversationId}`
-2. **Create if needed** — create a new conversation (status `"discovery"`) if:
+1. **"hi" shortcut** — if the message text is exactly `"hi"`, reset the conversation to `discovery` regardless of current status (clears `useCase`, `collectedData`, `browsePath`, `selectedUseCaseIds`, `messageHistory`)
+2. **Load conversation** — look up `users/{phone}` → get `activeConversationId` → load `conversations/{activeConversationId}`
+3. **Create if needed** — create a new conversation (status `"discovery"`) if:
    - no `activeConversationId` on the user, or
    - conversation doesn't exist, or
    - `status === "completed"`, or
    - `lastMessageAt` is more than 8 hours ago
-3. **Update timestamps** — `lastSeenAt` on user + `lastMessageAt` on conversation (parallel)
-4. **Log message** — append to `conversations/{id}/messages/` subcollection (fire-and-forget)
-5. **Route by status**
+4. **Update timestamps** — `lastSeenAt` on user + `lastMessageAt` on conversation (parallel)
+5. **Log message** — append to `conversations/{id}/messages/` subcollection (fire-and-forget)
+6. **Route by status**
 
 ```ts
 switch (conversation.status) {
-  case "discovery":        → discovery()
-  case "form_sent":        → handleFormReply()
-  case "refining":         → flowEngine()
-  case "confirming":       → handleConfirmation()
-  case "generating":       → "Still generating, hang tight!"
-  case "awaiting_payment": → "Please complete your payment using the link sent above."
+  case "discovery":           → discovery()
+  case "browsing":            → browsing()
+  case "form_sent":           → handleFormReply()
+  case "refining":            → flowEngine()
+  case "selecting_usecases":  → handleUseCaseSelection()
+  case "confirming":          → handleConfirmation()
+  case "generating":          → "Still working on it, hang tight!"
+  case "awaiting_payment":    → "Please complete your payment using the link sent above."
+  default:                    → discovery()
 }
 ```
 
@@ -100,45 +115,51 @@ switch (conversation.status) {
 
 **File:** `services/conversation/discovery.ts`
 
-Triggered when `status === "discovery"`. Runs on every message until an intent (use case) is detected.
+Triggered when `status === "discovery"`. Sends two messages on any non-actionable input.
 
-**Button tap (`button_reply`)**
-- Maps `buttonId` → useCase directly (`birthday`, `shop`, `event`)
-- Calls `initiateFlow()` → sets `useCase`, `status: "form_sent"`, sends WhatsApp Form
+**Popular product button tapped (`button_reply`, id starts with `prod-`)**
+- Looks up the product in the catalog
+- Sets `browsePath: [prodId]`, calls `initiateFlow()` → moves to `refining`
 
-**Free text**
-- Calls OpenAI (`gpt-4.1-nano`) with the user's message
-- Prompt asks LLM to identify intent as one of: `birthday`, `shop`, `event`, or `unknown`
-- If recognized → `initiateFlow()`
-- If unknown → send welcome message again with buttons
+**Category list item selected (`list_reply`, id starts with `cat-`)**
+- Sets `status: "browsing"`, `browsePath: [catId]`
+- Delegates to `browsing()`
 
-**Welcome message** includes:
-- Brief intro to Whybee
-- 3 quick-reply buttons: Birthday Video / Shop Promo / Event Invite
+**Anything else** → sends welcome (two messages):
+1. **Popular products** — 3 quick-reply buttons (🎂 Birthdays, 🛍️ Business Promos, 🎉 Events)
+2. **Browse list** — all 5 categories as a WhatsApp list message (Memories, Invitations, Business, Social Media, Documents)
 
 ---
 
-## Phase 2 — Form Collection
+## Phase 2 — Browsing
 
-**Handled in:** `handleIncomingMessage.ts` → `handleFormReply()`
+**File:** `services/conversation/browsing.ts`
 
-Triggered when `status === "form_sent"` and message `type === "form_reply"`.
+Triggered when `status === "browsing"`. Handles catalog navigation.
 
-WhatsApp Forms (nfm_reply) submit a JSON blob. This phase maps the form fields to `collectedData` using `field.formKey`.
+**Navigation rules:**
+- `list_reply` with a `prod-*` id → look up product, call `initiateFlow()` → moves to `refining`
+- `list_reply` with a `cat-*` id → update `browsePath: [catId]`, send product list for that category
+- Any other message → re-render current level
 
-If the message is not a `form_reply` (e.g. user sent a text while form is open) → "Please complete the form first 📋"
+**`sendCurrentLevel(cid, phone, browsePath)`** — re-renders the catalog level based on the last element of `browsePath`:
+- Ends with `cat-*` → send product list for that category
+- Ends with `prod-*` → send use case list for that product
+- Empty / unknown → fall back to top-level category list
 
-After mapping:
-- Sets `status: "refining"`
-- Calls `flowEngine()` so it can ask for remaining fields (usually images)
+Firestore is updated on every navigation step: `{ status: "browsing", browsePath: [...] }`.
 
 ---
 
-## Phase 3 — LLM Refinement
+## Phase 3 — Refining (Form Collection)
 
 **File:** `services/conversation/flowEngine.ts`
 
-Triggered when `status === "refining"`. Called after form submission and on every subsequent message.
+Triggered when `status === "refining"`. Called after product selection (via `initiateFlow`) and on every subsequent message.
+
+**`initiateFlow(phone, conversationId, useCase, browsePath)`** — entry point from browsing:
+1. Sets `status: "refining"`, `useCase` on the conversation
+2. Calls `flowEngine` with a synthetic empty message to kick off the first question
 
 **Image messages** — handled directly:
 - `mediaId` is appended to `collectedData.images` (or the relevant media field)
@@ -149,7 +170,7 @@ Triggered when `status === "refining"`. Called after form submission and on ever
 - Builds a prompt listing all fields + their current values
 - LLM returns `{ extractedFields, nextQuestion, isComplete }`
 - Saves any extracted fields to Firestore
-- If `isComplete === true` → calls `sendConfirmation()`
+- If `isComplete === true` → calls `sendUseCaseSelection()`
 - Otherwise → sends `nextQuestion` to the user
 
 **LLM completion rule:**
@@ -157,12 +178,29 @@ Triggered when `status === "refining"`. Called after form submission and on ever
 
 ---
 
-## Phase 4 — Confirmation
+## Phase 4 — Use Case Selection
+
+**File:** `services/conversation/useCaseSelection.ts`
+
+Triggered when refining completes. Sends a list of available use cases for the product.
+
+**`sendUseCaseSelection(phone, conversation)`**:
+- Resolves the catalog product from `browsePath` (last `prod-*` element)
+- Sends use case list: "Great! Now choose what you'd like created for your {productName}"
+- Sets `status: "selecting_usecases"`
+
+**`handleUseCaseSelection(phone, message, conversation)`**:
+- `list_reply` → validate use case exists, store `selectedUseCaseIds: [id]`, move to `confirming`, call `sendConfirmation()`
+- Other → resend use case list
+
+---
+
+## Phase 5 — Confirmation
 
 **File:** `services/conversation/confirmation.ts`
 
 **`sendConfirmation(phone, conversation)`**
-- Gets flow config → calls `config.confirmationTemplate(collectedData)` to build summary
+- Gets product config → calls `config.confirmationTemplate(collectedData)` to build summary
 - Sets `status: "confirming"`
 - Sends summary text + 2 buttons:
   - `✅ Create it!` (id: `"create"`)
@@ -170,26 +208,29 @@ Triggered when `status === "refining"`. Called after form submission and on ever
 
 **`handleConfirmation(phone, message, conversation)`**
 - `"create"` → calls `startFulfillment()`
-- `"restart"` → resets the same conversation doc in-place: clears `useCase`, `collectedData`, sets `status: "discovery"`, calls `discovery()` on the same conversation
+- `"restart"` → resets the same conversation doc in-place: clears `useCase`, `collectedData`, `browsePath`, `selectedUseCaseIds`, sets `status: "discovery"`, calls `discovery()` on the same conversation
 
 ---
 
-## Phase 5 — Fulfillment
+## Phase 6 — Fulfillment
 
 **File:** `services/conversation/fulfillment.ts`
 
 See [media-generation.md](./media-generation.md) for how outputs are generated and [payment.md](./payment.md) for the payment flow.
 
-After all outputs are sent and the payment link is delivered:
-- `status` → `"awaiting_payment"`
-- `collectedData.paymentLinkId` → Razorpay payment link ID (for webhook lookup)
+1. Sets `status: "generating"`
+2. Sends preview message (`"🎬 Here's your preview!"`)
+3. Iterates `conversation.selectedUseCaseIds`, looks up each `CatalogUseCase` via `findUseCase(id)`, generates and sends all outputs
+4. Creates Razorpay payment link
+5. Sends CTA button (`"💳 To receive your final files, please complete payment:"` + `"Complete Payment"` button)
+6. Sets `status: "awaiting_payment"`, stores `paymentData: { linkId, amount, createdAt }`
 
 ---
 
 ## Start Over
 
 "Start Over" button in confirmation resets the **same conversation document** without creating a new one:
-1. Update doc: `status: "discovery"`, `useCase: null`, `collectedData: {}`
-2. Call `discovery()` on the reset conversation (sends welcome message)
+1. Update doc: `status: "discovery"`, clear `useCase`, `collectedData`, `browsePath`, `selectedUseCaseIds`
+2. Call `discovery()` on the reset conversation (sends welcome messages)
 
-There are no reset commands. Any message during an active conversation continues from wherever it left off.
+Sending `"hi"` performs the same reset from any state.

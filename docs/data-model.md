@@ -26,22 +26,38 @@ Document ID is a Firestore auto-generated ID. Stored in `users/{phone}.activeCon
 |-------|------|-------------|
 | `phone` | string | E.164 phone number |
 | `status` | ConversationStatus | Current state (see below) |
-| `useCase` | string \| undefined | `"birthday"` \| `"shop"` \| `"event"` |
-| `collectedData` | object | All fields collected during the conversation |
+| `useCase` | string \| undefined | `"birthday"` \| `"business"` \| `"event"` |
+| `collectedData` | object | User-provided form inputs and media IDs |
+| `browsePath` | string[] \| undefined | Catalog navigation trail (e.g. `["cat-memories", "prod-birthdays"]`) |
+| `selectedUseCaseIds` | string[] \| undefined | Use case IDs selected at the selecting_usecases step |
+| `paymentData` | object \| undefined | Payment metadata (see below) |
 | `lastMessageAt` | Timestamp | Updated on every incoming message (used for idle timeout) |
 | `createdAt` | Timestamp | |
 | `updatedAt` | Timestamp | Updated on every status change |
+
+### `paymentData` object
+
+Set during fulfillment when the Razorpay payment link is created.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `linkId` | string | Razorpay payment link ID — used to correlate the webhook event |
+| `amount` | number | Amount in INR |
+| `createdAt` | Timestamp | When the link was created |
+| `paidAt` | Timestamp \| undefined | Set by webhook when payment is confirmed |
 
 ### ConversationStatus values
 
 | Status | Meaning |
 |--------|---------|
-| `discovery` | Intent not yet detected |
-| `form_sent` | WhatsApp Form sent, waiting for submission |
-| `refining` | LLM filling remaining fields conversationally |
+| `discovery` | Welcome sent, waiting for user to pick a product or browse |
+| `browsing` | User navigating category/product catalog |
+| `form_sent` | WhatsApp Form sent, waiting for nfm_reply submission |
+| `refining` | LLM collecting remaining fields conversationally |
+| `selecting_usecases` | User choosing what to create (use case list sent) |
 | `confirming` | Confirmation sent, waiting for button tap |
 | `generating` | Outputs being generated |
-| `awaiting_payment` | Payment link sent, waiting for payment |
+| `awaiting_payment` | Payment CTA sent, waiting for payment |
 | `completed` | Payment received |
 | `error` | Something went wrong |
 
@@ -54,34 +70,33 @@ Every incoming message is appended here (fire-and-forget, does not block routing
 | `phone` | string | Sender's E.164 number |
 | `messageId` | string | WhatsApp message ID |
 | `timestamp` | string | WhatsApp-provided timestamp |
-| `type` | string | `text`, `image`, `button_reply`, `form_reply`, etc. |
+| `type` | string | `text`, `image`, `button_reply`, `list_reply`, `form_reply`, etc. |
 | `text` | string? | Present for text messages |
 | `mediaId` | string? | Present for image/video/audio |
 | `buttonId` | string? | Present for button replies |
+| `listId` | string? | Present for list replies |
 | `formData` | object? | Present for form replies |
 | `createdAt` | Timestamp | When this record was written |
 
 ### `collectedData` structure
 
-Keys depend on the use case. Examples:
+Keys depend on the product. Examples:
 
 **Birthday:**
 ```json
 {
   "recipientName": "Priya",
   "birthdayMessage": "Wishing you joy and happiness!",
-  "images": ["media_id_1", "media_id_2"],
-  "paymentLinkId": "plink_abc123"
+  "images": ["media_id_1", "media_id_2"]
 }
 ```
 
-**Shop:**
+**Business Promos:**
 ```json
 {
   "shopName": "Ravi Stores",
   "description": "50% off all electronics this weekend",
-  "images": ["media_id_1"],
-  "paymentLinkId": "plink_def456"
+  "images": ["media_id_1"]
 }
 ```
 
@@ -91,13 +106,12 @@ Keys depend on the use case. Examples:
   "eventName": "Rahul's Wedding",
   "dateTime": "15 April 2025, 6:30 PM",
   "venue": "Grand Ballroom, Mumbai",
-  "images": [],
-  "paymentLinkId": "plink_ghi789"
+  "images": []
 }
 ```
 
 - `images` contains **WhatsApp media IDs** (not URLs). These are passed to generators.
-- `paymentLinkId` is set during fulfillment. Used to correlate the Razorpay webhook event.
+- Payment data is stored in the separate `paymentData` field, not in `collectedData`.
 
 ---
 
@@ -119,12 +133,24 @@ User messages → getOrCreateConversation()
 Old conversations (`completed`) are **never deleted** — they serve as history.
 
 "Start Over" during confirmation resets the **same document** back to `discovery`
-(clears `useCase` and `collectedData` — no new document created).
+(clears `useCase`, `collectedData`, `browsePath`, `selectedUseCaseIds` — no new document created).
+
+Sending `"hi"` performs the same full reset from any status.
 
 ---
 
 ## Firestore Indexes
 
-No composite indexes needed currently. All queries are single-document lookups by ID.
+### Composite index required
 
-If you add analytics queries (e.g. "all completed conversations for this week"), add indexes in `firestore.indexes.json`.
+The Razorpay webhook handler queries conversations by `paymentData.linkId`:
+
+```ts
+db.collection("conversations")
+  .where("paymentData.linkId", "==", paymentLinkId)
+  .limit(1)
+```
+
+This requires a **single-field index** (or composite) on `paymentData.linkId`. Add to `firestore.indexes.json` or create in the Firebase Console if queries fail.
+
+If you add analytics queries (e.g. "all completed conversations for this week"), add composite indexes in `firestore.indexes.json`.
