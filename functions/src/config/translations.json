@@ -1,7 +1,7 @@
 {
   "welcome.body": "👋 Welcome to *Whybee*! I create personalised content for you.\n\nHere are some popular options — or browse the full catalog below 👇",
-  "welcome.browseAll.body": "📂 Browse all categories:",
-  "welcome.browseAll.button": "Browse All",
+  "welcome.browseAll.body": "📂 Browse categories:",
+  "welcome.browseAll.button": "Browse",
 
   "browse.category.header": "📂 *{label}*\nChoose a product:",
   "browse.category.button": "Browse",
@@ -28,7 +28,7 @@
   "test.paymentBody": "🧪 *Test payment flow* — tap below to pay ₹1 and receive a stub video.",
   "test.paymentButton": "Pay ₹1 (Test)",
   "test.welcomeBody": "🧪 Test the full payment flow:",
-  "test.welcomeButton": "Generate Test Payment",
+  "test.welcomeButton": "Test Payment",
 
   "status.generating": "⏳ Still working on it, hang tight!",
   "status.awaitingPayment": "💳 Please complete your payment using the link sent above.",

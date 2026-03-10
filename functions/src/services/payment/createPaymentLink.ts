@@ -1,5 +1,12 @@
-import axios from "axios";
+import Razorpay from "razorpay";
 import { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET } from "config/env";
+
+function getClient(): Razorpay {
+  return new Razorpay({
+    key_id: RAZORPAY_KEY_ID.value(),
+    key_secret: RAZORPAY_KEY_SECRET.value(),
+  });
+}
 
 export async function createPaymentLink(
   phone: string,
@@ -7,28 +14,17 @@ export async function createPaymentLink(
   amount: number, // in INR
   description: string
 ): Promise<{ id: string; shortUrl: string }> {
-  const auth = Buffer.from(
-    `${RAZORPAY_KEY_ID.value()}:${RAZORPAY_KEY_SECRET.value()}`
-  ).toString("base64");
+  const client = getClient();
 
-  const { data } = await axios.post(
-    "https://api.razorpay.com/v1/payment_link",
-    {
-      amount: amount * 100, // convert to paise
-      currency: "INR",
-      description,
-      customer: { contact: phone },
-      reference_id: conversationId,
-      notify: { sms: false, email: false },
-      reminder_enable: false,
-    },
-    {
-      headers: {
-        Authorization: `Basic ${auth}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
+  const link = await client.paymentLink.create({
+    amount: amount * 100, // convert to paise
+    currency: "INR",
+    description,
+    customer: { contact: phone },
+    reference_id: conversationId,
+    notify: { sms: false, email: false },
+    reminder_enable: false,
+  });
 
-  return { id: data.id, shortUrl: data.short_url };
+  return { id: link.id, shortUrl: link.short_url };
 }
