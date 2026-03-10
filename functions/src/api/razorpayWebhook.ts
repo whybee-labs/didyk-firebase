@@ -8,6 +8,9 @@ import {
 } from "config/env";
 import { db } from "utils/firestore";
 import { sendText } from "services/whatsapp/sendText";
+import { sendVideo } from "services/whatsapp/sendVideo";
+import { generateVideo } from "services/generators/videoGenerator";
+import { t } from "utils/t";
 
 export const razorpayWebhook = onRequest(
   { secrets: [RAZORPAY_WEBHOOK_SECRET, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID] },
@@ -65,12 +68,15 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
 
   const phone = convSnap.data()?.phone as string;
 
+  await sendText(conversationId, phone, t("fulfillment.delivering"));
+
+  const stubVideoUrl = await generateVideo({});
+  await sendVideo(conversationId, phone, stubVideoUrl);
+
   await db.collection("conversations").doc(conversationId).update({
     status: "completed",
     updatedAt: new Date(),
   });
 
-  await sendText(conversationId, phone, "✅ Payment received! Your content will be delivered shortly.");
-
-  logger.info("Payment confirmed", { conversationId, phone });
+  logger.info("Payment confirmed, stub video sent", { conversationId, phone });
 }
