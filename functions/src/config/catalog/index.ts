@@ -5,6 +5,7 @@ import { generateText } from "services/generators/textGenerator";
 import { birthdayProduct } from "config/products/birthday";
 import { businessProduct } from "config/products/business";
 import { eventProduct } from "config/products/event";
+import { resumeProduct } from "config/products/resume";
 import { CatalogCategory, CatalogProduct, CatalogUseCase } from "./types";
 
 export const catalog: CatalogCategory[] = [
@@ -110,7 +111,6 @@ export const catalog: CatalogCategory[] = [
         id: "prod-business-promos",
         label: "🛍️ Business Promos",
         description: "Promote your business",
-        popular: true,
         productConfigId: "business",
         useCases: businessProduct.useCases,
       },
@@ -242,6 +242,21 @@ export const catalog: CatalogCategory[] = [
             ],
           },
         ],
+      },
+    ],
+  },
+  {
+    id: "cat-career",
+    label: "Career",
+    description: "Resumes, CVs & cover letters",
+    products: [
+      {
+        id: "prod-student-resume",
+        label: "📄 Student Resume",
+        description: "Land your next internship or job",
+        popular: true,
+        productConfigId: "resume",
+        useCases: resumeProduct.useCases,
       },
     ],
   },
