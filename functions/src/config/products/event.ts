@@ -22,7 +22,7 @@ export const eventProduct: ProductConfig = {
       description: "A video invite with event details and photos",
       outputs: [
         { type: "video", generate: generateVideo },
-        { type: "pdf", generate: generatePdf },
+        { type: "pdf", generate: (data) => generatePdf({ ...data, _template: "event-invite" }) },
       ],
     },
     {
@@ -39,7 +39,7 @@ export const eventProduct: ProductConfig = {
       description: "A printable poster for your event",
       outputs: [
         { type: "image", generate: generateImage },
-        { type: "pdf", generate: generatePdf },
+        { type: "pdf", generate: (data) => generatePdf({ ...data, _template: "event-invite" }) },
       ],
     },
   ],

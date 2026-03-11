@@ -54,7 +54,7 @@ export const catalog: CatalogCategory[] = [
             description: "An elegant wedding invitation video",
             outputs: [
               { type: "video", generate: generateVideo },
-              { type: "pdf", generate: generatePdf },
+              { type: "pdf", generate: (data) => generatePdf({ ...data, _template: "birthday-invite" }) },
             ],
           },
           {
@@ -212,7 +212,7 @@ export const catalog: CatalogCategory[] = [
             description: "A promotional flyer for any occasion",
             outputs: [
               { type: "image", generate: generateImage },
-              { type: "pdf", generate: generatePdf },
+              { type: "pdf", generate: (data) => generatePdf({ ...data, _template: "business-promo" }) },
             ],
           },
           {
@@ -221,7 +221,7 @@ export const catalog: CatalogCategory[] = [
             description: "A large-format event or promo poster",
             outputs: [
               { type: "image", generate: generateImage },
-              { type: "pdf", generate: generatePdf },
+              { type: "pdf", generate: (data) => generatePdf({ ...data, _template: "business-promo" }) },
             ],
           },
         ],
@@ -237,7 +237,7 @@ export const catalog: CatalogCategory[] = [
             label: "Brochure",
             description: "A professional brochure or lookbook",
             outputs: [
-              { type: "pdf", generate: generatePdf },
+              { type: "pdf", generate: (data) => generatePdf({ ...data, _template: "business-promo" }) },
               { type: "text", generate: generateText },
             ],
           },
