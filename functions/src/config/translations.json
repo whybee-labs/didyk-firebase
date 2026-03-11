@@ -19,14 +19,17 @@
   "form.photo.progress": "Got it! ({current}/{max}) Send more photos or type *done* when ready.",
   "form.photo.done": "Perfect, that's all the photos we need!",
   "form.photo.required": "Please send at least one photo first.",
-  "form.field.ask": "Please share: {label}",
+  "form.photo.request": "Now send your photos (1–3), then type *done* when you're ready 📸",
+
+  "form.followup.single": "One more thing — {field}?",
+  "form.followup.many": "Almost there! Still need: {fields}.",
 
   "fulfillment.preview": "🎬 Here's your preview!",
   "fulfillment.payment": "💳 To receive your final files, please complete payment:",
   "fulfillment.paymentButton": "Complete Payment",
   "fulfillment.delivering": "✅ Payment confirmed! Here's your content:",
 
-"status.generating": "⏳ Still working on it, hang tight!",
+  "status.generating": "⏳ Still working on it, hang tight!",
   "status.awaitingPayment": "💳 Please complete your payment using the link sent above.",
 
   "errors.generic": "Something went wrong. Please try again."

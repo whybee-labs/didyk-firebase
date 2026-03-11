@@ -8,6 +8,7 @@ export const businessProduct: ProductConfig = {
   name: "Business Promo",
   description: "Promotional content for your business",
   waFlowId: "BUSINESS_FLOW_ID_PLACEHOLDER",
+  openingPrompt: "Tell me about your promo! 🛍️ What's your business and what are you promoting? Type it out, then send 1–3 product or logo photos 📸",
   fields: [
     { key: "businessName", type: "text", required: true, label: "Business name", formKey: "business_name" },
     { key: "description", type: "text", required: true, label: "Promotion description", formKey: "description" },

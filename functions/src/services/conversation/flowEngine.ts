@@ -92,8 +92,7 @@ export async function flowEngine(
       return;
     }
 
-    const nextField = getNextMissingField(config.fields, collectedData);
-    const question = nextField ? t("form.field.ask", { label: nextField.label }) : null;
+    const question = buildFollowUpQuestion(config.fields, collectedData);
 
     const newHistory = trimHistory([
       ...history,
@@ -113,19 +112,16 @@ export async function flowEngine(
     return;
   }
 
-  // Fallback — ask for next missing field (e.g. first question on flow start)
-  const nextField = getNextMissingField(config.fields, collectedData);
-  if (nextField) {
-    const question = t("form.field.ask", { label: nextField.label });
-    const newHistory = trimHistory([
-      ...(conversation.messageHistory ?? []),
-      { role: "assistant" as const, content: question },
-    ]);
+  // Fallback — first time entering refining: send the open invitation
+  const isFirstEntry = !conversation.messageHistory || conversation.messageHistory.length === 0;
+  if (isFirstEntry) {
+    const openingPrompt = config.openingPrompt;
+    const newHistory: HistoryEntry[] = [{ role: "assistant", content: openingPrompt }];
     await db.collection("conversations").doc(conversation.conversationId).update({
       messageHistory: newHistory,
       updatedAt: new Date(),
     });
-    await sendText(conversation.conversationId, phone, question);
+    await sendText(conversation.conversationId, phone, openingPrompt);
   }
 }
 
@@ -140,17 +136,18 @@ function isComplete(fields: ProductField[], data: Record<string, unknown>): bool
   });
 }
 
-function getNextMissingField(fields: ProductField[], data: Record<string, unknown>): ProductField | null {
-  return (
-    fields.find((f) => {
-      if (!f.required) return false;
-      if (f.type === "media") {
-        const arr = data[f.key] as string[] | undefined;
-        return !Array.isArray(arr) || arr.length === 0;
-      }
-      return !data[f.key];
-    }) ?? null
-  );
+function buildFollowUpQuestion(fields: ProductField[], data: Record<string, unknown>): string | null {
+  const missingText = fields.filter((f) => f.type === "text" && f.required && !data[f.key]);
+  if (missingText.length === 1) return t("form.followup.single", { field: missingText[0].label });
+  if (missingText.length > 1) return t("form.followup.many", { fields: missingText.map((f) => f.label).join(", ") });
+
+  const requiredMedia = fields.find((f) => f.type === "media" && f.required);
+  if (requiredMedia) {
+    const arr = data[requiredMedia.key] as string[] | undefined;
+    if (!Array.isArray(arr) || arr.length === 0) return t("form.photo.request");
+  }
+
+  return null;
 }
 
 async function extractWithLLM(

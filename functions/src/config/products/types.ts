@@ -27,6 +27,7 @@ export interface ProductConfig {
   name: string;
   description: string;
   waFlowId: string;                                            // Meta WhatsApp Flow ID (placeholder)
+  openingPrompt: string;
   fields: ProductField[];
   useCases: CatalogUseCase[];
   confirmationTemplate: (data: Record<string, unknown>) => string;

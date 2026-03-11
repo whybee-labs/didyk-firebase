@@ -8,6 +8,7 @@ export const birthdayProduct: ProductConfig = {
   name: "Birthday",
   description: "Personalised birthday content for someone special",
   waFlowId: "BIRTHDAY_FLOW_ID_PLACEHOLDER",
+  openingPrompt: "Tell me about the birthday! 🎂 Who's it for and what message would you like? Type it all out, then send 1–3 photos of the birthday person 📸",
   fields: [
     { key: "recipientName", type: "text", required: true, label: "Recipient's name", formKey: "recipient_name" },
     { key: "birthdayMessage", type: "text", required: true, label: "Birthday message or wishes", formKey: "birthday_message" },
