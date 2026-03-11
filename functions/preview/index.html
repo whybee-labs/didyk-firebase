@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Whybee — Resume Template Gallery</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; background: #0b1020; color: #f5f5f5; }
+
+      .top-bar {
+        position: sticky; top: 0; z-index: 100;
+        display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+        padding: 14px 24px;
+        background: rgba(11,16,32,0.92); backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(148,163,184,0.15);
+      }
+      .top-bar h1 { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+      .badge {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 3px 9px; border-radius: 999px;
+        border: 1px solid rgba(129,140,248,0.45);
+        background: rgba(15,23,42,0.7);
+        color: #c7d2fe; font-size: 11px; letter-spacing: 0.04em;
+      }
+      .badge-dot { width: 6px; height: 6px; border-radius: 999px; background: #4ade80; box-shadow: 0 0 0 3px rgba(74,222,128,0.2); }
+      .spacer { flex: 1; }
+
+      .actions { display: flex; gap: 6px; }
+      .actions button {
+        font: inherit; border: 1px solid rgba(148,163,184,0.3); border-radius: 8px;
+        background: rgba(15,23,42,0.8); color: #e5e7eb; padding: 5px 12px; font-size: 11px;
+        cursor: pointer; transition: all 0.15s;
+      }
+      .actions button:hover { border-color: rgba(129,140,248,0.8); background: rgba(99,102,241,0.15); color: #fff; }
+
+      .grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 18px; padding: 20px 24px;
+      }
+      .card {
+        border-radius: 14px; overflow: hidden;
+        background: #0f172a;
+        border: 1px solid rgba(148,163,184,0.2);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+      }
+      .card:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(0,0,0,0.55); }
+      .card .preview { width: 100%; aspect-ratio: 210/297; background: #fff; display: flex; align-items: flex-start; justify-content: center; overflow: hidden; }
+      .card canvas { width: 100%; height: auto; display: block; }
+      .card .loading { padding: 40px; color: #555; font-size: 12px; text-align: center; }
+      .card-footer {
+        padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;
+      }
+      .card-footer .name { font-weight: 600; font-size: 13px; }
+      .card-footer .desc { font-size: 11px; color: #9ca3af; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+      .full-overlay {
+        display: none; position: fixed; inset: 0; z-index: 200;
+        background: rgba(0,0,0,0.88); backdrop-filter: blur(6px);
+        flex-direction: column; align-items: center;
+      }
+      .full-overlay.open { display: flex; }
+      .full-bar {
+        width: 100%; padding: 12px 24px;
+        display: flex; align-items: center; gap: 12px;
+        background: rgba(15,23,42,0.95);
+      }
+      .full-bar .name { font-weight: 600; font-size: 15px; flex: 1; }
+      .full-bar button {
+        font: inherit; border: 1px solid rgba(148,163,184,0.3); border-radius: 8px;
+        background: rgba(15,23,42,0.8); color: #e5e7eb; padding: 5px 14px; font-size: 12px;
+        cursor: pointer; transition: all 0.14s;
+      }
+      .full-bar button:hover { border-color: rgba(129,140,248,0.8); color: #fff; }
+      .full-bar button.primary { background: linear-gradient(135deg,#6366f1,#4f46e5); border-color: transparent; color: #fff; }
+      .full-canvas-wrap {
+        flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 20px;
+      }
+      .full-canvas-wrap canvas { max-width: 680px; width: 100%; border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); }
+      .page-label { font-size: 11px; color: #999; margin-top: 6px; }
+    </style>
+  </head>
+  <body>
+    <div class="top-bar">
+      <div class="badge"><span class="badge-dot"></span> Template Gallery</div>
+      <h1>Whybee Resume Templates</h1>
+      <div class="spacer"></div>
+      <div class="actions">
+        <button onclick="copyCmd()">Copy rebuild command</button>
+      </div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+
+    <div class="full-overlay" id="overlay">
+      <div class="full-bar">
+        <span class="name" id="full-name"></span>
+        <button onclick="nav(-1)">&#8592; Prev</button>
+        <button onclick="nav(1)">Next &#8594;</button>
+        <button class="primary" onclick="closeOverlay()">Close</button>
+      </div>
+      <div class="full-canvas-wrap" id="full-wrap"></div>
+    </div>
+
+    <script>
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+      const TEMPLATES = [
+        { key: "astralis",  label: "Astralis",  desc: "Two-column, green accent, skill badges" },
+        { key: "pulsar",    label: "Pulsar",     desc: "Pale-green background, modern bold layout" },
+        { key: "eclipse",   label: "Eclipse",    desc: "Clean single-column, centered serif name" },
+        { key: "comet",     label: "Comet",      desc: "Yellow header band, black badge labels" },
+        { key: "nebula",    label: "Nebula",     desc: "Navy header block, light sidebar" },
+        { key: "cosmos",    label: "Cosmos",     desc: "Dark charcoal header, single-column" },
+        { key: "celestial", label: "Celestial",  desc: "Full-height navy sidebar, white main" },
+        { key: "galaxy",    label: "Galaxy",     desc: "Formal serif, centered headings + rules" },
+        { key: "astral",    label: "Astral",     desc: "Photo area, two-column, gold accent" },
+        { key: "lunar",     label: "Lunar",      desc: "Boxed name, sidebar details, clean layout" },
+        { key: "aurora",    label: "Aurora",     desc: "Pink/blush gradient, two-column body" },
+        { key: "solstice",  label: "Solstice",   desc: "Ultra-minimal serif, no color" },
+      ];
+
+      let currentIdx = 0;
+      const bust = Date.now();
+
+      async function renderPdfToCanvas(url, canvas, scale) {
+        const pdf = await pdfjsLib.getDocument(url).promise;
+        const page = await pdf.getPage(1);
+        const vp = page.getViewport({ scale });
+        canvas.width = vp.width;
+        canvas.height = vp.height;
+        await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+      }
+
+      function buildGrid() {
+        const grid = document.getElementById("grid");
+        grid.innerHTML = "";
+        TEMPLATES.forEach((t, i) => {
+          const card = document.createElement("div");
+          card.className = "card";
+          card.onclick = () => openOverlay(i);
+          const preview = document.createElement("div");
+          preview.className = "preview";
+          const loading = document.createElement("div");
+          loading.className = "loading";
+          loading.textContent = "Loading...";
+          preview.appendChild(loading);
+          card.appendChild(preview);
+
+          const footer = document.createElement("div");
+          footer.className = "card-footer";
+          footer.innerHTML = `<span class="name">${t.label}</span><span class="desc">${t.desc}</span>`;
+          card.appendChild(footer);
+          grid.appendChild(card);
+
+          const canvas = document.createElement("canvas");
+          renderPdfToCanvas(`${t.key}.pdf?v=${bust}`, canvas, 1.2).then(() => {
+            preview.innerHTML = "";
+            preview.appendChild(canvas);
+          }).catch(() => {
+            loading.textContent = "PDF not found — run rebuild command";
+          });
+        });
+      }
+
+      async function openOverlay(idx) {
+        currentIdx = idx;
+        const t = TEMPLATES[idx];
+        document.getElementById("full-name").textContent = `${t.label} — ${t.desc}`;
+        const wrap = document.getElementById("full-wrap");
+        wrap.innerHTML = "<div style='color:#999;padding:40px'>Rendering...</div>";
+        document.getElementById("overlay").classList.add("open");
+
+        const pdf = await pdfjsLib.getDocument(`${t.key}.pdf?v=${bust}`).promise;
+        wrap.innerHTML = "";
+        for (let p = 1; p <= pdf.numPages; p++) {
+          const label = document.createElement("div");
+          label.className = "page-label";
+          label.textContent = `Page ${p} of ${pdf.numPages}`;
+          wrap.appendChild(label);
+          const canvas = document.createElement("canvas");
+          const page = await pdf.getPage(p);
+          const vp = page.getViewport({ scale: 2.5 });
+          canvas.width = vp.width;
+          canvas.height = vp.height;
+          await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+          wrap.appendChild(canvas);
+        }
+      }
+
+      function closeOverlay() { document.getElementById("overlay").classList.remove("open"); }
+      function nav(dir) { openOverlay((currentIdx + dir + TEMPLATES.length) % TEMPLATES.length); }
+
+      function copyCmd() {
+        const cmd = "cd functions && npm run build && node lib/scripts/previewResume.js";
+        navigator.clipboard.writeText(cmd).then(() => alert("Copied! Paste in terminal, run, then refresh.")).catch(() => prompt("Copy this:", cmd));
+      }
+
+      document.addEventListener("keydown", e => {
+        if (!document.getElementById("overlay").classList.contains("open")) return;
+        if (e.key === "Escape") closeOverlay();
+        if (e.key === "ArrowLeft") nav(-1);
+        if (e.key === "ArrowRight") nav(1);
+      });
+
+      buildGrid();
+    </script>
+  </body>
+</html>

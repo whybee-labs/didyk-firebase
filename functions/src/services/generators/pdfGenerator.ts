@@ -10,15 +10,34 @@
  *   data._watermark — false to skip watermark (default: true, i.e. preview mode)
  */
 
+import path from "path";
 import PDFDocument from "pdfkit";
 import { templateRegistry } from "services/documents/templateRegistry";
 import { uploadFile } from "services/storage/uploadFile";
 
+// ── Font paths (resolved relative to project root at runtime) ────────────────
+
+function fontsDir(): string {
+  return path.resolve(__dirname, "../../fonts");
+}
+
+function registerFonts(doc: PDFKit.PDFDocument): void {
+  const dir = fontsDir();
+  doc.registerFont("Inter",         path.join(dir, "Inter-Regular.otf"));
+  doc.registerFont("Inter-Medium",  path.join(dir, "Inter-Medium.otf"));
+  doc.registerFont("Inter-SemiBold", path.join(dir, "Inter-SemiBold.otf"));
+  doc.registerFont("Inter-Bold",    path.join(dir, "Inter-Bold.otf"));
+  doc.registerFont("Inter-Italic",  path.join(dir, "Inter-Italic.otf"));
+  doc.registerFont("NotoSerif",          path.join(dir, "NotoSerif-Regular.ttf"));
+  doc.registerFont("NotoSerif-Bold",     path.join(dir, "NotoSerif-Bold.ttf"));
+  doc.registerFont("NotoSerif-Italic",   path.join(dir, "NotoSerif-Italic.ttf"));
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export async function generatePdf(data: Record<string, unknown>): Promise<string> {
-  const templateName = String(data._template ?? "modern");
-  const watermark    = data._watermark !== false; // default true (preview)
+  const templateName = String(data._template ?? "astralis");
+  const watermark    = data._watermark !== false;
 
   const buffer = await renderPdf(data, templateName, watermark);
   return uploadFile(buffer, "application/pdf", "documents");
@@ -33,13 +52,14 @@ function renderPdf(
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc    = new PDFDocument({ size: "A4", margin: 0 });
+    registerFonts(doc);
     const chunks: Buffer[] = [];
 
     doc.on("data",  (c: Buffer) => chunks.push(c));
     doc.on("end",   () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    const render = templateRegistry[templateName] ?? templateRegistry["modern"];
+    const render = templateRegistry[templateName] ?? templateRegistry["astralis"];
     render(doc, data);
 
     if (watermark) renderWatermark(doc);
