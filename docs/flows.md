@@ -58,11 +58,12 @@ interface ProductConfig {
   id: "birthday" | "business" | "event";
   name: string;           // human-readable, used in messages and payment description
   description: string;    // used in LLM prompts
-  waFlowId: string;       // Meta WhatsApp Flow ID (set in Meta dashboard)
+  waFlowId: string;       // Meta WhatsApp Flow ID (set in Meta dashboard; unused in default flow)
+  openingPrompt: string;  // single open invitation sent at the start of refining
   fields: ProductField[]; // what data to collect
   useCases: CatalogUseCase[]; // canonical use cases for this product
   confirmationTemplate: (data: Record<string, unknown>) => string;
-  pricing: { amount: number; currency: "INR" };  // amount in INR
+  pricing: { INR: number; USD: number };
 }
 ```
 
@@ -84,8 +85,8 @@ interface ProductField {
 }
 ```
 
-- Fields with `formKey` are collected via the WhatsApp Form (nfm_reply)
-- Fields without `formKey` (usually `type: "media"`) are collected conversationally via the LLM engine
+- All fields are collected conversationally via the LLM (one-shot extraction from `openingPrompt` response)
+- `formKey` is retained for products that opt into WhatsApp Forms — not used in the default flow
 - `required: false` fields (like optional photos) don't block completion
 
 ---
@@ -112,34 +113,34 @@ Outputs are sent **in order** — put media before text.
 
 ### Birthday (`config/products/birthday.ts`)
 
-| Field | Type | Via | Label |
-|-------|------|-----|-------|
-| `recipientName` | text | Form | Recipient's name |
-| `birthdayMessage` | text | Form | Birthday message or wishes |
-| `images` | media | LLM | Photos of the birthday person (1–3) |
+| Field | Type | Label |
+|-------|------|-------|
+| `recipientName` | text | Recipient's name |
+| `birthdayMessage` | text | Birthday message or wishes |
+| `images` | media | Photos of the birthday person (1–3) |
 
-**Price:** ₹199
+**Price:** ₹199 / $5
 
 ### Business Promos (`config/products/business.ts`)
 
-| Field | Type | Via | Label |
-|-------|------|-----|-------|
-| `shopName` | text | Form | Shop / business name |
-| `description` | text | Form | Promotion description |
-| `images` | media | LLM | Product or logo photos (1–3) |
+| Field | Type | Label |
+|-------|------|-------|
+| `businessName` | text | Business name |
+| `description` | text | Promotion description |
+| `images` | media | Product or logo photos (1–3) |
 
-**Price:** ₹299
+**Price:** ₹299 / $7
 
 ### Event (`config/products/event.ts`)
 
-| Field | Type | Via | Label |
-|-------|------|-----|-------|
-| `eventName` | text | Form | Event name |
-| `dateTime` | text | Form | Date and time |
-| `venue` | text | Form | Venue or location |
-| `images` | media | LLM | Photos or banner (optional) |
+| Field | Type | Label |
+|-------|------|-------|
+| `eventName` | text | Event name |
+| `dateTime` | text | Date and time |
+| `venue` | text | Venue or location |
+| `images` | media | Photos or banner (optional) |
 
-**Price:** ₹249
+**Price:** ₹249 / $6
 
 ---
 
@@ -157,24 +158,17 @@ These products appear as quick-reply buttons on the welcome screen (bypass categ
 
 ## Adding a New Product
 
-1. **Create** `config/products/yourproduct.ts` — implement `ProductConfig`
+1. **Create** `config/products/yourproduct.ts` — implement `ProductConfig` (set `openingPrompt`, `fields`, `useCases`, `confirmationTemplate`, `pricing`)
 2. **Add** to `config/products/index.ts` — add to `productMap` and `UseCase` type
 3. **Add catalog entries** in `config/catalog/index.ts` — add to the relevant `CatalogCategory.products` array with appropriate `CatalogUseCase[]`
-4. **Create WhatsApp Form** in Meta dashboard → paste the Flow ID into `waFlowId`
-5. Generators are shared — reuse existing ones in `services/generators/`
+4. Generators are shared — reuse existing ones in `services/generators/`
+
+No Meta Form approval needed — all field collection is conversational via the LLM.
 
 ---
 
-## WhatsApp Forms
+## WhatsApp Forms (optional)
 
-Each product sends a WhatsApp Form (nfm_reply) to collect text fields in one shot.
-The `waFlowId` must be a real Flow ID from the Meta dashboard.
+WhatsApp Forms (nfm_reply) are supported for products that warrant a native structured UI, but are **not used by default**. The default flow uses one-shot LLM extraction via `openingPrompt`.
 
-Current placeholders:
-- `BIRTHDAY_FLOW_ID_PLACEHOLDER`
-- `BUSINESS_FLOW_ID_PLACEHOLDER`
-- `EVENT_FLOW_ID_PLACEHOLDER`
-
-Replace these once Forms are created in Meta.
-
-The form's field names must match the `formKey` values in the product's `fields` array.
+`waFlowId` is still present on `ProductConfig` for products that opt into Forms. Current values are placeholders (`BIRTHDAY_FLOW_ID_PLACEHOLDER`, etc.) and can be ignored unless you explicitly trigger `sendFlow()`.

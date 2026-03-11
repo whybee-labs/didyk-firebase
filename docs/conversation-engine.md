@@ -151,30 +151,35 @@ Firestore is updated on every navigation step: `{ status: "browsing", browsePath
 
 ---
 
-## Phase 3 — Refining (Form Collection)
+## Phase 3 — Refining (Field Collection)
 
 **File:** `services/conversation/flowEngine.ts`
 
-Triggered when `status === "refining"`. Called after product selection (via `initiateFlow`) and on every subsequent message.
+Triggered when `status === "refining"`. Called after product selection and on every subsequent message.
 
-**`initiateFlow(phone, conversationId, useCase, browsePath)`** — entry point from browsing:
-1. Sets `status: "refining"`, `useCase` on the conversation
-2. Calls `flowEngine` with a synthetic empty message to kick off the first question
+**First entry** (empty `messageHistory`):
+- Sends `config.openingPrompt` — a single open invitation defined per product (e.g. *"Tell me about the birthday! Who's it for and what message would you like?"*)
+- Saves the prompt to `messageHistory` as the first assistant turn
 
 **Image messages** — handled directly:
 - `mediaId` is appended to `collectedData.images` (or the relevant media field)
-- Saved to Firestore immediately
+- Saved to Firestore immediately; progress feedback sent to user
 - Re-runs the completion check
 
-**Text messages** — go through the LLM:
+**Text messages** — LLM extracts all fields at once:
 - Builds a prompt listing all fields + their current values
-- LLM returns `{ extractedFields, nextQuestion, isComplete }`
-- Saves any extracted fields to Firestore
-- If `isComplete === true` → calls `sendUseCaseSelection()`
-- Otherwise → sends `nextQuestion` to the user
+- LLM returns `{ extractedFields }` — extracts everything it can in one pass
+- Saves extracted fields to Firestore
+- If all required fields are complete → calls `sendUseCaseSelection()`
+- Otherwise → sends a single follow-up asking for **all** remaining missing fields at once (not one at a time)
 
-**LLM completion rule:**
-`isComplete = true` only when all required fields are filled AND any media fields have ≥ 1 item in their array.
+**Follow-up logic (`buildFollowUpQuestion`):**
+1. If text fields still missing → ask for all of them in one message
+2. Else if required media not yet uploaded → prompt for photos
+3. Else → null (shouldn't happen if `isComplete` is correct)
+
+**Completion rule:**
+All required fields filled AND any required media fields have ≥ 1 item in their array.
 
 ---
 
