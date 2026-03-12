@@ -21,6 +21,7 @@ export const partyProduct: ProductConfig = {
       id: "uc-party-vivid",
       label: "Vivid Party",
       description: "Bold and colourful, dark background, high energy",
+      pricing: { INR: 99, USD: 2 },
       outputs: [{ type: "pdf" as const, generate: (data) => generatePdf({ ...data, _template: "party-vivid" }) }],
     },
   ],
@@ -35,5 +36,4 @@ export const partyProduct: ProductConfig = {
       ...(data.dressCode ? [`👗 *Dress code:* ${data.dressCode}`] : []),
       ...(data.note      ? [`💬 *Note:* ${data.note}`]            : []),
     ].join("\n"),
-  pricing: { INR: 99, USD: 2 },
 };

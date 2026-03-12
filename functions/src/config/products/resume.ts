@@ -6,6 +6,7 @@ const useCases = Object.entries(resumeTemplates).map(([key, meta]) => ({
   id: `uc-resume-${key}`,
   label: `${meta.label} Resume`,
   description: meta.description,
+  pricing: { INR: 89, USD: 2 },
   outputs: [{ type: "pdf" as const, generate: (data: Record<string, unknown>) => generatePdf({ ...data, _template: key }) }],
 }));
 
@@ -102,5 +103,4 @@ export const resumeProduct: ProductConfig = {
       ...(data.address ? [`📍 *Location:* ${data.address}`]    : []),
     ].join("\n");
   },
-  pricing: { INR: 89, USD: 2 },
 };

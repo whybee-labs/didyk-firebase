@@ -19,6 +19,7 @@ export const birthdayProduct: ProductConfig = {
       id: "uc-birthday-video",
       label: "Birthday Video",
       description: "A personalised video with photos and wishes",
+      pricing: { INR: 199, USD: 5 },
       outputs: [
         { type: "video", generate: generateVideo },
         { type: "text", generate: generateText },
@@ -28,6 +29,7 @@ export const birthdayProduct: ProductConfig = {
       id: "uc-birthday-card",
       label: "Birthday Card",
       description: "A beautiful digital birthday card",
+      pricing: { INR: 199, USD: 5 },
       outputs: [
         { type: "image", generate: generateImage },
       ],
@@ -36,6 +38,7 @@ export const birthdayProduct: ProductConfig = {
       id: "uc-photo-collage",
       label: "Photo Collage",
       description: "A photo collage with a personalised message",
+      pricing: { INR: 199, USD: 5 },
       outputs: [
         { type: "image", generate: generateImage },
       ],
@@ -51,5 +54,4 @@ export const birthdayProduct: ProductConfig = {
       `📸 *Photos:* ${images.length} uploaded`,
     ].join("\n");
   },
-  pricing: { INR: 199, USD: 5 },
 };

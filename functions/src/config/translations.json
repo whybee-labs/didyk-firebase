@@ -8,7 +8,7 @@
   "browse.product.header": "📦 *{label}*\nWhat would you like created?",
   "browse.product.button": "Choose",
 
-  "usecase.body": "Great! Now choose what you'd like created for your {productName}:",
+  "usecase.body": "Amazing! Pick the style you'd love for your {productName} 👇",
   "usecase.button": "Choose",
 
   "confirm.prompt": "Does this look right?",
@@ -26,9 +26,9 @@
   "form.followup.many": "Almost there! Still need: {fields}.",
 
   "fulfillment.preview": "🎬 Here's your preview!",
-  "fulfillment.payment": "💳 To receive your final files, please complete payment:",
-  "fulfillment.paymentButton": "Complete Payment",
-  "fulfillment.delivering": "✅ Payment confirmed! Here's your content:",
+  "fulfillment.payment": "Happy with your preview? Your final file — clean, crisp, and watermark-free — will arrive right here on WhatsApp the moment you pay 🎉",
+  "fulfillment.paymentButton": "Pay {symbol}{amount} instantly",
+  "fulfillment.delivering": "🎉 Thank you so much! Your file is on its way — we hope it's everything you imagined. Wishing you all the very best 💫",
 
   "status.generating": "⏳ Still working on it, hang tight!",
   "status.awaitingPayment": "💳 Please complete your payment using the link sent above.",

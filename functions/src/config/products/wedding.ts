@@ -21,12 +21,14 @@ export const weddingProduct: ProductConfig = {
       id: "uc-wedding-ivory",
       label: "Ivory Classic",
       description: "Elegant ivory & gold with serif typography",
+      pricing: { INR: 149, USD: 3 },
       outputs: [{ type: "pdf" as const, generate: (data) => generatePdf({ ...data, _template: "wedding-ivory" }) }],
     },
     {
       id: "uc-wedding-midnight",
       label: "Midnight Luxe",
       description: "Dark and dramatic with gold accents",
+      pricing: { INR: 149, USD: 3 },
       outputs: [{ type: "pdf" as const, generate: (data) => generatePdf({ ...data, _template: "wedding-midnight" }) }],
     },
   ],
@@ -41,5 +43,4 @@ export const weddingProduct: ProductConfig = {
       ...(data.rsvpBy    ? [`📝 *RSVP by:* ${data.rsvpBy}`]       : []),
       ...(data.hostedBy  ? [`👨‍👩‍👧 *Hosted by:* ${data.hostedBy}`]  : []),
     ].join("\n"),
-  pricing: { INR: 149, USD: 3 },
 };

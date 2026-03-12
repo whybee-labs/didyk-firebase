@@ -19,6 +19,7 @@ export const businessProduct: ProductConfig = {
       id: "uc-business-promo-poster",
       label: "Promo Poster",
       description: "An eye-catching promotional poster",
+      pricing: { INR: 299, USD: 7 },
       outputs: [
         { type: "image", generate: generateImage },
         { type: "text", generate: generateText },
@@ -28,6 +29,7 @@ export const businessProduct: ProductConfig = {
       id: "uc-business-promo-video",
       label: "Promo Video",
       description: "A short promotional video for your business",
+      pricing: { INR: 299, USD: 7 },
       outputs: [
         { type: "video", generate: generateVideo },
       ],
@@ -36,6 +38,7 @@ export const businessProduct: ProductConfig = {
       id: "uc-business-promo-reel",
       label: "Promo Reel",
       description: "A vertical reel for Instagram or WhatsApp status",
+      pricing: { INR: 299, USD: 7 },
       outputs: [
         { type: "video", generate: generateVideo },
       ],
@@ -51,5 +54,4 @@ export const businessProduct: ProductConfig = {
       `📸 *Photos:* ${images.length} uploaded`,
     ].join("\n");
   },
-  pricing: { INR: 299, USD: 7 },
 };

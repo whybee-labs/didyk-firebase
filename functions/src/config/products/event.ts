@@ -20,6 +20,7 @@ export const eventProduct: ProductConfig = {
       id: "uc-event-invite",
       label: "Event Invite",
       description: "A video invite with event details and photos",
+      pricing: { INR: 249, USD: 6 },
       outputs: [
         { type: "video", generate: generateVideo },
         { type: "pdf", generate: (data) => generatePdf({ ...data, _template: "event-invite" }) },
@@ -29,6 +30,7 @@ export const eventProduct: ProductConfig = {
       id: "uc-event-card",
       label: "Event Card",
       description: "A digital event invitation card",
+      pricing: { INR: 249, USD: 6 },
       outputs: [
         { type: "image", generate: generateImage },
       ],
@@ -37,6 +39,7 @@ export const eventProduct: ProductConfig = {
       id: "uc-event-poster",
       label: "Event Poster",
       description: "A printable poster for your event",
+      pricing: { INR: 249, USD: 6 },
       outputs: [
         { type: "image", generate: generateImage },
         { type: "pdf", generate: (data) => generatePdf({ ...data, _template: "event-invite" }) },
@@ -54,5 +57,4 @@ export const eventProduct: ProductConfig = {
       `📸 *Photos:* ${images.length > 0 ? `${images.length} uploaded` : "None"}`,
     ].join("\n");
   },
-  pricing: { INR: 249, USD: 6 },
 };

@@ -16,6 +16,9 @@ export async function sendUseCaseSelection(phone: string, conversation: Conversa
   const catalogProduct = prodId ? findProduct(prodId) : null;
   const useCases = catalogProduct?.useCases ?? config.useCases;
 
+  const currency = phone.startsWith("91") ? "INR" : "USD";
+  const symbol   = currency === "INR" ? "₹" : "$";
+
   await db.collection("conversations").doc(conversation.conversationId).update({
     status: "selecting_usecases",
     updatedAt: new Date(),
@@ -31,7 +34,7 @@ export async function sendUseCaseSelection(phone: string, conversation: Conversa
         rows: useCases.map((uc) => ({
           id: uc.id,
           title: uc.label,
-          description: uc.description,
+          description: `${uc.description} · ${symbol}${uc.pricing[currency]}`,
         })),
       },
     ]

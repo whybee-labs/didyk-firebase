@@ -20,6 +20,7 @@ export const engagementProduct: ProductConfig = {
       id: "uc-engagement-rose",
       label: "Rose Romance",
       description: "Soft blush pink, romantic and elegant",
+      pricing: { INR: 99, USD: 2 },
       outputs: [{ type: "pdf" as const, generate: (data) => generatePdf({ ...data, _template: "engagement-rose" }) }],
     },
   ],
@@ -33,5 +34,4 @@ export const engagementProduct: ProductConfig = {
       ...(data.hostedBy ? [`👨‍👩‍👧 *Hosted by:* ${data.hostedBy}`] : []),
       ...(data.note     ? [`💬 *Note:* ${data.note}`]              : []),
     ].join("\n"),
-  pricing: { INR: 99, USD: 2 },
 };

@@ -20,6 +20,7 @@ export interface CatalogUseCase {
   id: string;
   label: string;
   description: string;
+  pricing: { INR: number; USD: number };
   outputs: UseCaseOutput[];
 }
 
@@ -32,5 +33,4 @@ export interface ProductConfig {
   fields: ProductField[];
   useCases: CatalogUseCase[];
   confirmationTemplate: (data: Record<string, unknown>) => string;
-  pricing: { INR: number; USD: number };
 }

@@ -37,13 +37,15 @@ export async function startFulfillment(phone: string, conversation: Conversation
   }
 
   // Detect currency from phone country code (+91 = India = INR, everything else = USD)
-  const currency = phone.startsWith("91") ? "INR" : "USD";
-  const amount = config.pricing[currency];
+  const currency   = phone.startsWith("91") ? "INR" : "USD";
+  const symbol     = currency === "INR" ? "₹" : "$";
+  const selectedUc = findUseCase(conversation.selectedUseCaseIds?.[0] ?? "");
+  const amount     = selectedUc?.pricing[currency] ?? 0;
 
   // Create Razorpay payment link and send to user
   const { id, shortUrl } = await createPaymentLink(phone, cid, amount, `Whybee ${config.name}`, currency);
 
-  await sendCTAButton(cid, phone, t("fulfillment.payment"), t("fulfillment.paymentButton"), shortUrl);
+  await sendCTAButton(cid, phone, t("fulfillment.payment"), t("fulfillment.paymentButton", { symbol, amount: String(amount) }), shortUrl);
 
   await db.collection("conversations").doc(cid).update({
     status: "awaiting_payment",

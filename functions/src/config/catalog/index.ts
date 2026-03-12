@@ -22,8 +22,8 @@ export const catalog: CatalogCategory[] = [
         productConfigId: "birthday",
         useCases: [
           ...birthdayProduct.useCases,
-          { id: "uc-birthday-bloom",  label: "Birthday Card — Bloom",  description: "Pink floral card with name & personal message",   outputs: [{ type: "pdf" as const, generate: pdf("birthday-invite") }] },
-          { id: "uc-birthday-golden", label: "Birthday Card — Golden", description: "Classic cream & gold card, timeless and elegant",   outputs: [{ type: "pdf" as const, generate: pdf("birthday-golden") }] },
+          { id: "uc-birthday-bloom",  label: "Birthday Card — Bloom",  description: "Pink floral card with name & personal message",   pricing: { INR: 199, USD: 5 }, outputs: [{ type: "pdf" as const, generate: pdf("birthday-invite") }] },
+          { id: "uc-birthday-golden", label: "Birthday Card — Golden", description: "Classic cream & gold card, timeless and elegant",  pricing: { INR: 199, USD: 5 }, outputs: [{ type: "pdf" as const, generate: pdf("birthday-golden") }] },
         ],
       },
       {
@@ -32,8 +32,8 @@ export const catalog: CatalogCategory[] = [
         description: "Mark milestones and special moments",
         productConfigId: "birthday",
         useCases: [
-          { id: "uc-anniversary-video", label: "Anniversary Video", description: "A heartfelt anniversary video",         outputs: [{ type: "video", generate: generateVideo }] },
-          { id: "uc-anniversary-card",  label: "Anniversary Card",  description: "A beautiful digital anniversary card", outputs: [{ type: "image", generate: generateImage }] },
+          { id: "uc-anniversary-video", label: "Anniversary Video", description: "A heartfelt anniversary video",         pricing: { INR: 199, USD: 5 }, outputs: [{ type: "video", generate: generateVideo }] },
+          { id: "uc-anniversary-card",  label: "Anniversary Card",  description: "A beautiful digital anniversary card", pricing: { INR: 199, USD: 5 }, outputs: [{ type: "image", generate: generateImage }] },
         ],
       },
     ],
@@ -49,8 +49,8 @@ export const catalog: CatalogCategory[] = [
         description: "Elegant wedding invitations",
         productConfigId: "wedding",
         useCases: [
-          { id: "uc-wedding-ivory",    label: "Ivory Classic",   description: "Elegant ivory & gold, serif typography",  outputs: [{ type: "pdf" as const, generate: pdf("wedding-ivory") }] },
-          { id: "uc-wedding-midnight", label: "Midnight Luxe",   description: "Dark and dramatic with gold accents",     outputs: [{ type: "pdf" as const, generate: pdf("wedding-midnight") }] },
+          { id: "uc-wedding-ivory",    label: "Ivory Classic",   description: "Elegant ivory & gold, serif typography",  pricing: { INR: 149, USD: 3 }, outputs: [{ type: "pdf" as const, generate: pdf("wedding-ivory") }] },
+          { id: "uc-wedding-midnight", label: "Midnight Luxe",   description: "Dark and dramatic with gold accents",     pricing: { INR: 149, USD: 3 }, outputs: [{ type: "pdf" as const, generate: pdf("wedding-midnight") }] },
         ],
       },
       {
@@ -59,7 +59,7 @@ export const catalog: CatalogCategory[] = [
         description: "Romantic engagement invitations",
         productConfigId: "engagement",
         useCases: [
-          { id: "uc-engagement-rose", label: "Rose Romance", description: "Soft blush pink, romantic and elegant", outputs: [{ type: "pdf" as const, generate: pdf("engagement-rose") }] },
+          { id: "uc-engagement-rose", label: "Rose Romance", description: "Soft blush pink, romantic and elegant", pricing: { INR: 99, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("engagement-rose") }] },
         ],
       },
       {
@@ -69,9 +69,9 @@ export const catalog: CatalogCategory[] = [
         popular: true,
         productConfigId: "event",
         useCases: [
-          { id: "uc-event-midnight", label: "Midnight",   description: "Navy & gold, formal and elegant",           outputs: [{ type: "pdf" as const, generate: pdf("event-invite") }] },
-          { id: "uc-event-modern",   label: "Modern",     description: "Indigo/violet, contemporary and bold",      outputs: [{ type: "pdf" as const, generate: pdf("event-modern") }] },
-          { id: "uc-event-video",    label: "Event Video",description: "A video invite with event details",         outputs: [{ type: "video", generate: generateVideo }] },
+          { id: "uc-event-midnight", label: "Midnight",    description: "Navy & gold, formal and elegant",           pricing: { INR: 249, USD: 6 }, outputs: [{ type: "pdf" as const, generate: pdf("event-invite") }] },
+          { id: "uc-event-modern",   label: "Modern",      description: "Indigo/violet, contemporary and bold",      pricing: { INR: 249, USD: 6 }, outputs: [{ type: "pdf" as const, generate: pdf("event-modern") }] },
+          { id: "uc-event-video",    label: "Event Video", description: "A video invite with event details",         pricing: { INR: 249, USD: 6 }, outputs: [{ type: "video", generate: generateVideo }] },
         ],
       },
       {
@@ -80,8 +80,8 @@ export const catalog: CatalogCategory[] = [
         description: "Birthday parties, housewarmings & celebrations",
         productConfigId: "party",
         useCases: [
-          { id: "uc-party-vivid", label: "Vivid Party", description: "Bold & colourful, dark background, high energy", outputs: [{ type: "pdf" as const, generate: pdf("party-vivid") }] },
-          { id: "uc-party-video", label: "Party Video", description: "A fun party invitation video",                   outputs: [{ type: "video", generate: generateVideo }] },
+          { id: "uc-party-vivid", label: "Vivid Party", description: "Bold & colourful, dark background, high energy", pricing: { INR: 99, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("party-vivid") }] },
+          { id: "uc-party-video", label: "Party Video", description: "A fun party invitation video",                   pricing: { INR: 99, USD: 2 }, outputs: [{ type: "video", generate: generateVideo }] },
         ],
       },
     ],
@@ -104,8 +104,8 @@ export const catalog: CatalogCategory[] = [
         description: "Announce a new product or service",
         productConfigId: "business",
         useCases: [
-          { id: "uc-launch-video",  label: "Launch Video",  description: "A punchy product launch video", outputs: [{ type: "video", generate: generateVideo }] },
-          { id: "uc-launch-poster", label: "Launch Poster", description: "A bold product launch poster",  outputs: [{ type: "image", generate: generateImage }] },
+          { id: "uc-launch-video",  label: "Launch Video",  description: "A punchy product launch video", pricing: { INR: 299, USD: 7 }, outputs: [{ type: "video", generate: generateVideo }] },
+          { id: "uc-launch-poster", label: "Launch Poster", description: "A bold product launch poster",  pricing: { INR: 299, USD: 7 }, outputs: [{ type: "image", generate: generateImage }] },
         ],
       },
     ],
@@ -121,9 +121,9 @@ export const catalog: CatalogCategory[] = [
         description: "Feed posts, reels & stories",
         productConfigId: "business",
         useCases: [
-          { id: "uc-instagram-post",  label: "Feed Post",   description: "A polished square post for your feed", outputs: [{ type: "image", generate: generateImage }] },
-          { id: "uc-instagram-reel",  label: "Reel",        description: "A short-form vertical video",          outputs: [{ type: "video", generate: generateVideo }] },
-          { id: "uc-instagram-story", label: "Story Card",  description: "An eye-catching story graphic",        outputs: [{ type: "image", generate: generateImage }] },
+          { id: "uc-instagram-post",  label: "Feed Post",   description: "A polished square post for your feed", pricing: { INR: 299, USD: 7 }, outputs: [{ type: "image", generate: generateImage }] },
+          { id: "uc-instagram-reel",  label: "Reel",        description: "A short-form vertical video",          pricing: { INR: 299, USD: 7 }, outputs: [{ type: "video", generate: generateVideo }] },
+          { id: "uc-instagram-story", label: "Story Card",  description: "An eye-catching story graphic",        pricing: { INR: 299, USD: 7 }, outputs: [{ type: "image", generate: generateImage }] },
         ],
       },
       {
@@ -132,9 +132,9 @@ export const catalog: CatalogCategory[] = [
         description: "Status updates and broadcasts",
         productConfigId: "business",
         useCases: [
-          { id: "uc-status-image", label: "Status Image", description: "A striking image for your status",     outputs: [{ type: "image", generate: generateImage }] },
-          { id: "uc-status-video", label: "Status Video", description: "A short video for your status",        outputs: [{ type: "video", generate: generateVideo }] },
-          { id: "uc-quote-poster", label: "Quote Poster", description: "A beautifully designed quote card",    outputs: [{ type: "image", generate: generateImage }] },
+          { id: "uc-status-image", label: "Status Image", description: "A striking image for your status",     pricing: { INR: 299, USD: 7 }, outputs: [{ type: "image", generate: generateImage }] },
+          { id: "uc-status-video", label: "Status Video", description: "A short video for your status",        pricing: { INR: 299, USD: 7 }, outputs: [{ type: "video", generate: generateVideo }] },
+          { id: "uc-quote-poster", label: "Quote Poster", description: "A beautifully designed quote card",    pricing: { INR: 299, USD: 7 }, outputs: [{ type: "image", generate: generateImage }] },
         ],
       },
     ],
@@ -150,8 +150,8 @@ export const catalog: CatalogCategory[] = [
         description: "Print-ready promotional materials",
         productConfigId: "business",
         useCases: [
-          { id: "uc-flyer-impact", label: "Flyer — Impact", description: "Bold dark design, strong headline",     outputs: [{ type: "image", generate: generateImage }, { type: "pdf" as const, generate: pdf("business-promo") }] },
-          { id: "uc-flyer-clean",  label: "Flyer — Studio", description: "Clean minimal white, professional",    outputs: [{ type: "image", generate: generateImage }, { type: "pdf" as const, generate: pdf("business-clean") }] },
+          { id: "uc-flyer-impact", label: "Flyer — Impact", description: "Bold dark design, strong headline",     pricing: { INR: 299, USD: 7 }, outputs: [{ type: "image", generate: generateImage }, { type: "pdf" as const, generate: pdf("business-promo") }] },
+          { id: "uc-flyer-clean",  label: "Flyer — Studio", description: "Clean minimal white, professional",    pricing: { INR: 299, USD: 7 }, outputs: [{ type: "image", generate: generateImage }, { type: "pdf" as const, generate: pdf("business-clean") }] },
         ],
       },
       {
@@ -160,7 +160,7 @@ export const catalog: CatalogCategory[] = [
         description: "Professional brochures and lookbooks",
         productConfigId: "business",
         useCases: [
-          { id: "uc-brochure", label: "Brochure", description: "A professional brochure or lookbook", outputs: [{ type: "pdf" as const, generate: pdf("business-clean") }, { type: "text", generate: generateText }] },
+          { id: "uc-brochure", label: "Brochure", description: "A professional brochure or lookbook", pricing: { INR: 299, USD: 7 }, outputs: [{ type: "pdf" as const, generate: pdf("business-clean") }, { type: "text", generate: generateText }] },
         ],
       },
     ],
@@ -177,14 +177,14 @@ export const catalog: CatalogCategory[] = [
         popular: true,
         productConfigId: "resume",
         useCases: [
-          { id: "uc-resume-astralis",  label: "Astralis",  description: "Two-column, green accent, skill badges",    outputs: [{ type: "pdf" as const, generate: pdf("astralis") }] },
-          { id: "uc-resume-nebula",    label: "Nebula",    description: "Navy header with a clean light sidebar",    outputs: [{ type: "pdf" as const, generate: pdf("nebula") }] },
-          { id: "uc-resume-celestial", label: "Celestial", description: "Full-height navy sidebar, white main area", outputs: [{ type: "pdf" as const, generate: pdf("celestial") }] },
-          { id: "uc-resume-cosmos",    label: "Cosmos",    description: "Dark charcoal header, single-column body",  outputs: [{ type: "pdf" as const, generate: pdf("cosmos") }] },
-          { id: "uc-resume-aurora",    label: "Aurora",    description: "Pink/blush gradient header, two-column",    outputs: [{ type: "pdf" as const, generate: pdf("aurora") }] },
-          { id: "uc-resume-eclipse",   label: "Eclipse",   description: "Single-column, centered serif name",        outputs: [{ type: "pdf" as const, generate: pdf("eclipse") }] },
-          { id: "uc-resume-solstice",  label: "Solstice",  description: "Ultra-minimal, serif, no color",            outputs: [{ type: "pdf" as const, generate: pdf("solstice") }] },
-          { id: "uc-resume-ats",       label: "ATS",       description: "Single-column, ATS-optimised for job apps", outputs: [{ type: "pdf" as const, generate: pdf("ats") }] },
+          { id: "uc-resume-astralis",  label: "Astralis",  description: "Two-column, green accent, skill badges",    pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("astralis") }] },
+          { id: "uc-resume-nebula",    label: "Nebula",    description: "Navy header with a clean light sidebar",    pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("nebula") }] },
+          { id: "uc-resume-celestial", label: "Celestial", description: "Full-height navy sidebar, white main area", pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("celestial") }] },
+          { id: "uc-resume-cosmos",    label: "Cosmos",    description: "Dark charcoal header, single-column body",  pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("cosmos") }] },
+          { id: "uc-resume-aurora",    label: "Aurora",    description: "Pink/blush gradient header, two-column",    pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("aurora") }] },
+          { id: "uc-resume-eclipse",   label: "Eclipse",   description: "Single-column, centered serif name",        pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("eclipse") }] },
+          { id: "uc-resume-solstice",  label: "Solstice",  description: "Ultra-minimal, serif, no color",            pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("solstice") }] },
+          { id: "uc-resume-ats",       label: "ATS",       description: "Single-column, ATS-optimised for job apps", pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("ats") }] },
         ],
       },
     ],
