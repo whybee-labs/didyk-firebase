@@ -49,7 +49,7 @@ export async function discovery(
 }
 
 async function sendWelcome(conversationId: string, phone: string): Promise<void> {
-  const popular = popularProducts();
+  const popular = popularProducts().slice(0, 3); // WhatsApp max 3 buttons
 
   // Message 1: popular product quick-pick buttons
   await sendButtons(conversationId, phone, t("welcome.body"),
