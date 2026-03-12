@@ -23,7 +23,7 @@ export interface CatalogUseCase {
 }
 
 export interface ProductConfig {
-  id: "birthday" | "business" | "event" | "resume";
+  id: "birthday" | "business" | "event" | "resume" | "wedding" | "engagement" | "party";
   name: string;
   description: string;
   waFlowId: string;                                            // Meta WhatsApp Flow ID (placeholder)

@@ -8,6 +8,8 @@
   "scripts": {
     "build": "tsc && tsc-alias",
     "build:watch": "tsc --watch",
+    "preview:resumes": "node lib/scripts/previewResume.js",
+    "preview:invites": "node lib/scripts/previewInvites.js",
     "preview:serve": "node lib/scripts/servePreview.js",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions",

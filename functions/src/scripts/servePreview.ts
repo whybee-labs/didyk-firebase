@@ -1,5 +1,5 @@
 /**
- * Serves the resume preview gallery and generates PDFs on demand with optional primaryColor.
+ * Serves the template preview gallery and generates PDFs on demand with optional primaryColor.
  * Run from functions/: node lib/scripts/servePreview.js
  * Open http://localhost:4174
  */
@@ -8,15 +8,16 @@ import path from "path";
 import http from "http";
 import url from "url";
 import PDFDocument from "pdfkit";
-import { resumeTemplates } from "services/documents/templateRegistry";
+import { resumeTemplates, templateRegistry } from "services/documents/templateRegistry";
 import { registerFonts, SAMPLE_DATA } from "./previewResume";
+import { INVITE_TEMPLATES } from "./previewInvites";
 
 const PORT = 4174;
 const PREVIEW_DIR = path.join(process.cwd(), "preview");
 
-const TEMPLATE_COLORS: Record<string, [string, string, string]> = {
+// Resume templates support accent colour swatches
+const RESUME_COLORS: Record<string, string[]> = {
   astralis:  ["#2d6a4f", "#1a2744", "#d4637a"],
-  pulsar:    ["#f0f7da", "#fef9e7", "#fce4ec"],
   eclipse:   ["#1a1a1a", "#1a2744", "#2d6a4f"],
   comet:     ["#fdd835", "#2d6a4f", "#d4637a"],
   nebula:    ["#1a2744", "#2d6a4f", "#7b1fa2"],
@@ -30,12 +31,30 @@ const TEMPLATE_COLORS: Record<string, [string, string, string]> = {
   ats:       ["#1a2744", "#2d6a4f", "#c0392b"],
 };
 
+// Invite templates: no colour picking (empty array → client falls back to static PDF)
+const INVITE_DATA: Record<string, Record<string, unknown>> = Object.fromEntries(
+  INVITE_TEMPLATES.map((t) => [t.key, t.data]),
+);
+
+// Combined map returned by /templates
+const TEMPLATE_COLORS: Record<string, string[]> = {
+  ...RESUME_COLORS,
+  ...Object.fromEntries(INVITE_TEMPLATES.map((t) => [t.key, [] as string[]])),
+};
+
 function generatePdfBuffer(
   templateKey: string,
   primaryColor: string,
 ): Promise<{ buffer: Buffer; timeMs: number }> {
-  const meta = resumeTemplates[templateKey];
-  if (!meta) return Promise.reject(new Error(`Unknown template: ${templateKey}`));
+  const isInvite = templateKey in INVITE_DATA;
+  const renderFn = isInvite
+    ? templateRegistry[templateKey]
+    : resumeTemplates[templateKey]?.render;
+  if (!renderFn) return Promise.reject(new Error(`Unknown template: ${templateKey}`));
+
+  const data: Record<string, unknown> = isInvite
+    ? INVITE_DATA[templateKey]
+    : { ...SAMPLE_DATA, primaryColor };
 
   const start = Date.now();
   const chunks: Buffer[] = [];
@@ -43,15 +62,11 @@ function generatePdfBuffer(
   registerFonts(doc);
   doc.on("data", (chunk: Buffer) => chunks.push(chunk));
 
-  const data = { ...SAMPLE_DATA, primaryColor } as Record<string, unknown>;
-  meta.render(doc, data);
+  renderFn(doc, data);
   doc.end();
 
   return new Promise((resolve, reject) => {
-    doc.on("end", () => {
-      const timeMs = Date.now() - start;
-      resolve({ buffer: Buffer.concat(chunks), timeMs });
-    });
+    doc.on("end", () => resolve({ buffer: Buffer.concat(chunks), timeMs: Date.now() - start }));
     doc.on("error", reject);
   });
 }
@@ -79,7 +94,8 @@ const server = http.createServer(async (req, res) => {
   if (pathname === "/generate" && req.method === "GET") {
     const template = query.template as string;
     const color = (query.color as string)?.replace(/^#/, "") ?? "";
-    if (!template || !/^[0-9A-Fa-f]{6}$/.test(color)) {
+    const isInvite = template && template in INVITE_DATA;
+    if (!template || (!isInvite && !/^[0-9A-Fa-f]{6}$/.test(color))) {
       res.statusCode = 400;
       res.setHeader("Content-Type", "text/plain");
       res.end("Missing or invalid template or color (use 6-digit hex without #)");

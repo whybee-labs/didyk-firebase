@@ -18,7 +18,7 @@ import { uploadFile } from "services/storage/uploadFile";
 // ── Font paths (resolved relative to project root at runtime) ────────────────
 
 function fontsDir(): string {
-  return path.resolve(__dirname, "../../fonts");
+  return path.resolve(__dirname, "../../../fonts");
 }
 
 function registerFonts(doc: PDFKit.PDFDocument): void {

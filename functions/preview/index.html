@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Whybee — Resume Template Gallery</title>
+    <title>Whybee — Template Gallery</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
@@ -96,7 +96,7 @@
   <body>
     <div class="top-bar">
       <div class="badge"><span class="badge-dot"></span> Template Gallery</div>
-      <h1>Whybee Resume Templates</h1>
+      <h1>Whybee Template Gallery</h1>
       <span class="server-hint" id="server-hint">Open at <strong>http://localhost:4174</strong> for accent colors</span>
       <div class="spacer"></div>
       <div class="actions">
@@ -125,19 +125,35 @@
       pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
       const TEMPLATES = [
-        { key: "astralis",  label: "Astralis",  desc: "Two-column, green accent, skill badges" },
-        { key: "pulsar",    label: "Pulsar",     desc: "Pale-green background, modern bold layout" },
-        { key: "eclipse",   label: "Eclipse",    desc: "Clean single-column, centered serif name" },
-        { key: "comet",     label: "Comet",      desc: "Yellow header band, black badge labels" },
-        { key: "nebula",    label: "Nebula",     desc: "Navy header block, light sidebar" },
-        { key: "cosmos",    label: "Cosmos",     desc: "Dark charcoal header, single-column" },
-        { key: "celestial", label: "Celestial",  desc: "Full-height navy sidebar, white main" },
-        { key: "galaxy",    label: "Galaxy",     desc: "Formal serif, centered headings + rules" },
-        { key: "astral",    label: "Astral",     desc: "Photo area, two-column, gold accent" },
-        { key: "lunar",     label: "Lunar",      desc: "Boxed name, sidebar details, clean layout" },
-        { key: "aurora",    label: "Aurora",     desc: "Pink/blush gradient, two-column body" },
-        { key: "solstice",  label: "Solstice",   desc: "Ultra-minimal serif, no color" },
-        { key: "ats",      label: "ATS",        desc: "Single-column, ATS-optimized parsing" },
+        // Resumes
+        { key: "astralis",        label: "Astralis",          desc: "Two-column, green accent, skill badges" },
+        { key: "eclipse",         label: "Eclipse",           desc: "Clean single-column, centered serif name" },
+        { key: "comet",           label: "Comet",             desc: "Yellow header band, black badge labels" },
+        { key: "nebula",          label: "Nebula",            desc: "Navy header block, light sidebar" },
+        { key: "cosmos",          label: "Cosmos",            desc: "Dark charcoal header, single-column" },
+        { key: "celestial",       label: "Celestial",         desc: "Full-height navy sidebar, white main" },
+        { key: "galaxy",          label: "Galaxy",            desc: "Formal serif, centered headings + rules" },
+        { key: "astral",          label: "Astral",            desc: "Photo area, two-column, gold accent" },
+        { key: "lunar",           label: "Lunar",             desc: "Boxed name, sidebar details, clean layout" },
+        { key: "aurora",          label: "Aurora",            desc: "Pink/blush gradient, two-column body" },
+        { key: "solstice",        label: "Solstice",          desc: "Ultra-minimal serif, no color" },
+        { key: "ats",             label: "ATS",               desc: "Single-column, ATS-optimized parsing" },
+        // Events
+        { key: "event-invite",    label: "Event — Midnight",  desc: "Navy & gold, serif headline, elegant dots" },
+        { key: "event-modern",    label: "Event — Modern",    desc: "Indigo left bar, pill rows, contemporary" },
+        // Birthday
+        { key: "birthday-invite", label: "Birthday — Bloom",  desc: "Pink florals, festive circles, warm tone" },
+        { key: "birthday-golden", label: "Birthday — Golden", desc: "Cream double border, gold ornaments" },
+        // Wedding
+        { key: "wedding-ivory",   label: "Wedding — Ivory",   desc: "Ivory & gold, double border, romantic" },
+        { key: "wedding-midnight",label: "Wedding — Midnight",desc: "Dark luxury, gold stripe, full-bleed" },
+        // Engagement
+        { key: "engagement-rose", label: "Engagement — Rose", desc: "Blush pink header, romantic script name" },
+        // Party
+        { key: "party-vivid",     label: "Party — Vivid",     desc: "Dark background, bold tri-color stripes" },
+        // Business
+        { key: "business-promo",  label: "Business — Impact", desc: "Navy header, teal CTA, bold impact layout" },
+        { key: "business-clean",  label: "Business — Studio", desc: "White & teal, left accent bar, minimal" },
       ];
 
       let currentIdx = 0;
@@ -333,7 +349,7 @@
       function nav(dir) { openOverlay((currentIdx + dir + TEMPLATES.length) % TEMPLATES.length); }
 
       function copyCmd() {
-        const cmd = "cd functions && npm run build && npm run preview:serve";
+        const cmd = "cd functions && npm run build && npm run preview:resumes && npm run preview:invites && npm run preview:serve";
         navigator.clipboard.writeText(cmd).then(() => alert("Copied! Run in terminal, then open http://localhost:4174")).catch(() => prompt("Copy this:", cmd));
       }
 
