@@ -8,6 +8,7 @@ import { discovery } from "services/conversation/discovery";
 import { flowEngine } from "services/conversation/flowEngine";
 import { handleConfirmation } from "services/conversation/confirmation";
 import { handleUseCaseSelection } from "services/conversation/useCaseSelection";
+import { handleFeedback } from "services/conversation/feedback";
 import { t } from "utils/t";
 
 export type ConversationStatus =
@@ -19,6 +20,7 @@ export type ConversationStatus =
   | "confirming"
   | "generating"
   | "awaiting_payment"
+  | "awaiting_feedback"
   | "completed"
   | "error";
 
@@ -41,6 +43,11 @@ export interface Conversation {
     currency: "INR" | "USD";
     createdAt: Date;
     paidAt?: Date;
+  };
+  feedbackData?: {
+    rating: string;
+    comment?: string;
+    submittedAt: Date;
   };
   messageHistory?: HistoryEntry[];
   lastMessageAt: Date;
@@ -139,6 +146,10 @@ export async function handleIncomingMessage(
 
     case "awaiting_payment":
       await sendText(conversation.conversationId, phone, t("status.awaitingPayment"));
+      break;
+
+    case "awaiting_feedback":
+      await handleFeedback(phone, message, conversation);
       break;
 
     default:

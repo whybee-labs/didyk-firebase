@@ -14,6 +14,7 @@ import { sendDocument } from "services/whatsapp/sendDocument";
 import { sendAudio } from "services/whatsapp/sendAudio";
 import { findUseCase } from "config/catalog";
 import { OutputType } from "config/products/types";
+import { sendFeedbackRequest } from "services/conversation/feedback";
 import { t } from "utils/t";
 
 export const razorpayWebhook = onRequest(
@@ -116,10 +117,12 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
   }
 
   await db.collection("conversations").doc(conversationId).update({
-    status: "completed",
     "paymentData.paidAt": new Date(),
     updatedAt: new Date(),
   });
+
+  // Ask for feedback — this also sets status to "awaiting_feedback"
+  await sendFeedbackRequest(conversationId, phone);
 
   logger.info("Payment confirmed, outputs dispatched", { conversationId, phone, allSucceeded });
 }
