@@ -16,7 +16,8 @@ export async function sendConfirmation(phone: string, conversation: Conversation
     updatedAt: new Date(),
   });
 
-  await sendButtons(conversation.conversationId, phone, summary, [
+  await sendText(conversation.conversationId, phone, summary);
+  await sendButtons(conversation.conversationId, phone, t("confirm.prompt"), [
     { id: "create", title: t("confirm.createButton") },
     { id: "restart", title: t("confirm.restartButton") },
   ]);

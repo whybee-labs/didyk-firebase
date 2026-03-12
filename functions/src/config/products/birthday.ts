@@ -49,8 +49,6 @@ export const birthdayProduct: ProductConfig = {
       `👤 *For:* ${data.recipientName ?? "—"}`,
       `💬 *Message:* ${data.birthdayMessage ?? "—"}`,
       `📸 *Photos:* ${images.length} uploaded`,
-      "",
-      "Does this look right?",
     ].join("\n");
   },
   pricing: { INR: 199, USD: 5 },

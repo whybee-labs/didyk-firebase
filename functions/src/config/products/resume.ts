@@ -44,8 +44,6 @@ export const resumeProduct: ProductConfig = {
       ...(data.email      ? [`📧 *Email:* ${data.email}`]      : []),
       ...(data.phone      ? [`📱 *Phone:* ${data.phone}`]      : []),
       ...(data.address    ? [`📍 *Location:* ${data.address}`]    : []),
-      "",
-      "Does this look right?",
     ].join("\n"),
   pricing: { INR: 89, USD: 2 },
 };

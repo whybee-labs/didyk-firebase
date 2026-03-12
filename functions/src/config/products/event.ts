@@ -52,8 +52,6 @@ export const eventProduct: ProductConfig = {
       `📅 *When:* ${data.dateTime ?? "—"}`,
       `📍 *Where:* ${data.venue ?? "—"}`,
       `📸 *Photos:* ${images.length > 0 ? `${images.length} uploaded` : "None"}`,
-      "",
-      "Does this look right?",
     ].join("\n");
   },
   pricing: { INR: 249, USD: 6 },

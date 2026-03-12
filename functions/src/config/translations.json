@@ -11,6 +11,7 @@
   "usecase.body": "Great! Now choose what you'd like created for your {productName}:",
   "usecase.button": "Choose",
 
+  "confirm.prompt": "Does this look right?",
   "confirm.createButton": "✅ Create it!",
   "confirm.restartButton": "🔄 Start Over",
   "confirm.nudge": "Tap one of the buttons above to continue.",

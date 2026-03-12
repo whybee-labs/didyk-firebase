@@ -49,8 +49,6 @@ export const businessProduct: ProductConfig = {
       `🏪 *Business:* ${data.businessName ?? "—"}`,
       `📢 *Promotion:* ${data.description ?? "—"}`,
       `📸 *Photos:* ${images.length} uploaded`,
-      "",
-      "Does this look right?",
     ].join("\n");
   },
   pricing: { INR: 299, USD: 7 },
