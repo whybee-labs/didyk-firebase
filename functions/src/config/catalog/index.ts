@@ -47,7 +47,6 @@ export const catalog: CatalogCategory[] = [
         id: "prod-weddings",
         label: "💒 Weddings",
         description: "Elegant wedding invitations",
-        popular: true,
         productConfigId: "wedding",
         useCases: [
           { id: "uc-wedding-ivory",    label: "Ivory Classic",   description: "Elegant ivory & gold, serif typography",  outputs: [{ type: "pdf" as const, generate: pdf("wedding-ivory") }] },
