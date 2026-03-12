@@ -9,7 +9,11 @@ import {
 import { db } from "utils/firestore";
 import { sendText } from "services/whatsapp/sendText";
 import { sendVideo } from "services/whatsapp/sendVideo";
-import { generateVideo } from "services/generators/videoGenerator";
+import { sendImage } from "services/whatsapp/sendImage";
+import { sendDocument } from "services/whatsapp/sendDocument";
+import { sendAudio } from "services/whatsapp/sendAudio";
+import { findUseCase } from "config/catalog";
+import { OutputType } from "config/products/types";
 import { t } from "utils/t";
 
 export const razorpayWebhook = onRequest(
@@ -73,12 +77,21 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
   const convSnap = convQuery.docs[0];
   const conversationId = convSnap.id;
 
-  const phone = convSnap.data()?.phone as string;
+  const convData = convSnap.data();
+  const phone = convData?.phone as string;
+  const selectedUseCaseIds: string[] = convData?.selectedUseCaseIds ?? [];
+  const collectedData: Record<string, unknown> = convData?.collectedData ?? {};
 
   await sendText(conversationId, phone, t("fulfillment.delivering"));
 
-  const stubVideoUrl = await generateVideo({});
-  await sendVideo(conversationId, phone, stubVideoUrl);
+  for (const ucId of selectedUseCaseIds) {
+    const uc = findUseCase(ucId);
+    if (!uc?.outputs) continue;
+    for (const output of uc.outputs) {
+      const result = await output.generate({ ...collectedData, _watermark: false });
+      await dispatchOutput(conversationId, phone, output.type, result);
+    }
+  }
 
   await db.collection("conversations").doc(conversationId).update({
     status: "completed",
@@ -86,5 +99,15 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
     updatedAt: new Date(),
   });
 
-  logger.info("Payment confirmed, stub video sent", { conversationId, phone });
+  logger.info("Payment confirmed, final outputs sent", { conversationId, phone });
+}
+
+async function dispatchOutput(conversationId: string, phone: string, type: OutputType, value: string): Promise<void> {
+  switch (type) {
+    case "video":  return sendVideo(conversationId, phone, value);
+    case "image":  return sendImage(conversationId, phone, value);
+    case "pdf":    return sendDocument(conversationId, phone, value, "whybee.pdf");
+    case "audio":  return sendAudio(conversationId, phone, value);
+    case "text":   return sendText(conversationId, phone, value);
+  }
 }
