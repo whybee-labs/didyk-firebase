@@ -31,7 +31,7 @@ export async function startFulfillment(phone: string, conversation: Conversation
     const uc = findUseCase(ucId);
     if (!uc?.outputs) continue;
     for (const output of uc.outputs) {
-      const result = await output.generate(conversation.collectedData);
+      const result = await output.generate({ ...conversation.collectedData, _phone: phone, _conversationId: cid });
       await dispatchOutput(cid, phone, output.type, result);
     }
   }

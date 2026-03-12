@@ -15,11 +15,13 @@ import { randomUUID } from "crypto";
 export async function uploadFile(
   buffer: Buffer,
   mimeType: string,
-  folder = "uploads"
+  folder = "uploads",
+  fileName?: string
 ): Promise<string> {
   const token = randomUUID();
   const ext   = mimeType.split("/")[1] ?? "bin";
-  const path  = `${folder}/${Date.now()}-${token.slice(0, 8)}.${ext}`;
+  const name  = fileName ?? `${Date.now()}-${token.slice(0, 8)}`;
+  const path  = `${folder}/${name}.${ext}`;
   const file  = getStorage().bucket().file(path);
 
   await file.save(buffer, {

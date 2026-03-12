@@ -41,17 +41,19 @@ export const razorpayWebhook = onRequest(
       return;
     }
 
-    // Respond 200 immediately so Razorpay doesn't retry
-    res.status(200).send("OK");
-
     const event = req.body?.event as string | undefined;
-    if (event !== "payment_link.paid") return;
 
-    try {
-      await handlePaymentLinkPaid(req.body);
-    } catch (err) {
-      logger.error("Error handling payment_link.paid", { err });
+    if (event === "payment_link.paid") {
+      try {
+        await handlePaymentLinkPaid(req.body);
+      } catch (err) {
+        logger.error("Error handling payment_link.paid", { err });
+      }
     }
+
+    // Respond after work completes — Cloud Run drops sockets after res.send(),
+    // which causes ECONNRESET on Storage uploads if we respond first.
+    res.status(200).send("OK");
   }
 );
 
@@ -78,18 +80,38 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
   const conversationId = convSnap.id;
 
   const convData = convSnap.data();
+
+  // Idempotency: skip if already processed
+  if (convData?.paymentData?.paidAt) {
+    logger.info("Payment already processed, skipping", { conversationId });
+    return;
+  }
+
   const phone = convData?.phone as string;
   const selectedUseCaseIds: string[] = convData?.selectedUseCaseIds ?? [];
   const collectedData: Record<string, unknown> = convData?.collectedData ?? {};
 
   await sendText(conversationId, phone, t("fulfillment.delivering"));
 
+  let allSucceeded = true;
+
   for (const ucId of selectedUseCaseIds) {
     const uc = findUseCase(ucId);
     if (!uc?.outputs) continue;
     for (const output of uc.outputs) {
-      const result = await output.generate({ ...collectedData, _watermark: false });
-      await dispatchOutput(conversationId, phone, output.type, result);
+      try {
+        const result = await output.generate({
+          ...collectedData,
+          _watermark: false,
+          _phone: phone,
+          _conversationId: conversationId,
+        });
+        await dispatchOutput(conversationId, phone, output.type, result);
+      } catch (err) {
+        allSucceeded = false;
+        logger.error("Output generation failed", { ucId, type: output.type, err });
+        await sendText(conversationId, phone, t("errors.outputFailed")).catch(() => undefined);
+      }
     }
   }
 
@@ -99,7 +121,7 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
     updatedAt: new Date(),
   });
 
-  logger.info("Payment confirmed, final outputs sent", { conversationId, phone });
+  logger.info("Payment confirmed, outputs dispatched", { conversationId, phone, allSucceeded });
 }
 
 async function dispatchOutput(conversationId: string, phone: string, type: OutputType, value: string): Promise<void> {

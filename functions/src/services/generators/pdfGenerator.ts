@@ -6,8 +6,10 @@
  * microservice), replace only this file. The interface stays the same.
  *
  * data conventions:
- *   data._template  — template name (default: "modern"). See templateRegistry.ts.
- *   data._watermark — false to skip watermark (default: true, i.e. preview mode)
+ *   data._template       — template name (default: "astralis"). See templateRegistry.ts.
+ *   data._watermark      — false to skip watermark (default: true, i.e. preview mode)
+ *   data._phone          — used in Storage filename (e.g. "919876543210")
+ *   data._conversationId — used in Storage filename (first 8 chars)
  */
 
 import path from "path";
@@ -39,8 +41,13 @@ export async function generatePdf(data: Record<string, unknown>): Promise<string
   const templateName = String(data._template ?? "astralis");
   const watermark    = data._watermark !== false;
 
+  const phone    = data._phone    ? String(data._phone).replace(/\D/g, "").slice(-10) : undefined;
+  const cid      = data._conversationId ? String(data._conversationId).slice(0, 8)  : undefined;
+  const suffix   = watermark ? "preview" : "final";
+  const fileName = [phone, cid, suffix].filter(Boolean).join("-");
+
   const buffer = await renderPdf(data, templateName, watermark);
-  return uploadFile(buffer, "application/pdf", "documents");
+  return uploadFile(buffer, "application/pdf", "documents", fileName || undefined);
 }
 
 // ── Renderer ──────────────────────────────────────────────────────────────────

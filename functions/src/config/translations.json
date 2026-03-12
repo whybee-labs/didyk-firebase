@@ -33,5 +33,6 @@
   "status.generating": "⏳ Still working on it, hang tight!",
   "status.awaitingPayment": "💳 Please complete your payment using the link sent above.",
 
-  "errors.generic": "Something went wrong. Please try again."
+  "errors.generic": "Something went wrong. Please try again.",
+  "errors.outputFailed": "⚠️ Something went wrong generating your file. Please contact support."
 }
