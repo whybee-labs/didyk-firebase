@@ -38,7 +38,5 @@
   "errors.outputFailed": "⚠️ Something went wrong generating your file. Please contact support.",
 
   "feedback.prompt": "🙏🏻 How did we do?",
-  "feedback.commentPrompt": "💬 Thanks! Any suggestions for us? (or just say *skip*)",
-  "feedback.thanks": "💙 Thank you so much — your feedback truly means the world to us. We hope to create something special for you again soon 🌟",
-  "feedback.skip": "👋🏻 No worries! Enjoy your content — we'd love to have you back anytime 🌟"
+  "feedback.thanks": "💙 Thank you so much — your feedback truly means the world to us. We hope to create something special for you again soon 🌟"
 }
