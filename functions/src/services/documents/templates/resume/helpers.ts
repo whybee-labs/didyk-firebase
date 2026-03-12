@@ -45,6 +45,15 @@ export interface ResumeData {
   address?: string;
   linkedin?: string;
   website?: string;
+  /** Optional primary accent color (hex e.g. #1a2744). Used for headings, rules, accents. */
+  primaryColor?: string;
+}
+
+/** Returns primaryColor if valid 6-digit hex, otherwise defaultHex. */
+export function getPrimaryColor(d: ResumeData, defaultHex: string): string {
+  const c = d.primaryColor;
+  if (c && typeof c === "string" && /^#[0-9A-Fa-f]{6}$/.test(c.trim())) return c.trim();
+  return defaultHex;
 }
 
 // ── Parse raw data (handles both structured JSON and flat strings) ───────────
@@ -63,6 +72,7 @@ export function parseResumeData(raw: Record<string, unknown>): ResumeData {
     address:    raw.address ? String(raw.address) : undefined,
     linkedin:   raw.linkedin ? String(raw.linkedin) : undefined,
     website:    raw.website ? String(raw.website) : undefined,
+    primaryColor: raw.primaryColor ? String(raw.primaryColor) : undefined,
   };
 }
 

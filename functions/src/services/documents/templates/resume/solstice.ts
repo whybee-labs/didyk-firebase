@@ -1,11 +1,11 @@
 import {
-  PW, pageBreak, hr, parseResumeData,
+  PW, pageBreak, hr, parseResumeData, getPrimaryColor,
   renderExperience, renderEducation, renderSkillsGrid, renderProjects,
 } from "./helpers";
 
 export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): void {
   const d = parseResumeData(data);
-  const BLACK = "#1a1a1a";
+  const BLACK = getPrimaryColor(d, "#1a1a1a");
   const GREY = "#555555";
   const M = 52;
   const W = PW - M * 2;

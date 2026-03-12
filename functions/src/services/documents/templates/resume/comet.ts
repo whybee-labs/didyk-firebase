@@ -1,17 +1,17 @@
 import {
-  PW, pageBreak, parseResumeData,
+  PW, pageBreak, parseResumeData, getPrimaryColor,
   renderExperience, renderEducation, renderSkillsPills, renderProjects,
 } from "./helpers";
 
 export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): void {
   const d = parseResumeData(data);
-  const YELLOW = "#fdd835";
+  const PRIMARY = getPrimaryColor(d, "#fdd835");
   const BADGE_BG = "#1a1a1a";
   const BADGE_FG = "#ffffff";
   const M = 50;
   const W = PW - M * 2;
 
-  doc.rect(0, 0, PW, 125).fill(YELLOW);
+  doc.rect(0, 0, PW, 125).fill(PRIMARY);
 
   doc.circle(M + 40, 62, 38).fill("#e8e8e8");
   doc.circle(M + 40, 62, 36).fill("#f5f5f5");
@@ -70,7 +70,7 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
 
   if (d.skills?.length) {
     badge("SKILLS");
-    renderSkillsPills(doc, d.skills, M, doc.y, W, YELLOW, "#1a1a1a");
+    renderSkillsPills(doc, d.skills, M, doc.y, W, PRIMARY, "#1a1a1a");
     doc.y += 10;
   }
 

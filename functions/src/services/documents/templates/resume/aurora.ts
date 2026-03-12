@@ -1,11 +1,11 @@
 import {
-  PW, pageBreak, parseResumeData,
+  PW, pageBreak, parseResumeData, getPrimaryColor,
   renderExperience, renderEducation, renderSkillsPills, renderProjects,
 } from "./helpers";
 
 export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): void {
   const d = parseResumeData(data);
-  const PINK = "#d4637a";
+  const PINK = getPrimaryColor(d, "#d4637a");
   const PINK_LIGHT = "#fce4ec";
   const DARK = "#2c2c2c";
   const M = 44;
@@ -14,7 +14,7 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
   // ── Blush header area ──
   doc.rect(0, 0, PW * 0.44, 118).fill(PINK_LIGHT);
 
-  // Photo placeholder in pink area
+  // Photo placeholder
   doc.circle(M + 36, 38, 34).fill("#e8b0c0");
   doc.circle(M + 36, 38, 32).fill("#f0c0d0");
   doc.font("Inter").fontSize(7).fillColor("#fff")
@@ -75,7 +75,7 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
 
   if (d.skills?.length) {
     heading("Skills");
-    renderSkillsPills(doc, d.skills, M, doc.y, W, PINK, "#ffffff");
+    renderSkillsPills(doc, d.skills, M, doc.y, W, PINK, "#fff");
     doc.y += 10;
   }
 

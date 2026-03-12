@@ -1,5 +1,5 @@
 import {
-  PW, pageBreak, hr, parseResumeData,
+  PW, pageBreak, hr, parseResumeData, getPrimaryColor,
   renderExperience, renderEducation, renderSkillsGrid, renderProjects,
 } from "./helpers";
 
@@ -7,7 +7,7 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
   const d = parseResumeData(data);
   const M = 55;
   const W = PW - M * 2;
-  const DARK = "#1a1a1a";
+  const DARK = getPrimaryColor(d, "#1a1a1a");
 
   // Small role label above name
   doc.font("Inter").fontSize(9).fillColor("#777777")
@@ -25,7 +25,7 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
   }
 
   let y = doc.y + 10;
-  hr(doc, M, y, W, "#999999", 0.6);
+  hr(doc, M, y, W, DARK, 0.6);
   y += 16;
   doc.y = y;
 
@@ -34,7 +34,7 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
     pageBreak(doc, 40);
     doc.font("NotoSerif-Bold").fontSize(10.5).fillColor(DARK)
       .text("SUMMARY", M, doc.y, { width: W });
-    hr(doc, M, doc.y + 3, W, "#cccccc", 0.3);
+    hr(doc, M, doc.y + 3, W, DARK, 0.3);
     doc.y += 8;
     doc.font("Inter").fontSize(8.5).fillColor("#333333")
       .text(d.summary, M, doc.y, { width: W, lineGap: 2 });
@@ -46,7 +46,7 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
     pageBreak(doc, 40);
     doc.font("NotoSerif-Bold").fontSize(10.5).fillColor(DARK)
       .text("EXPERIENCE", M, doc.y, { width: W });
-    hr(doc, M, doc.y + 3, W, "#cccccc", 0.3);
+    hr(doc, M, doc.y + 3, W, DARK, 0.3);
     doc.y += 8;
     renderExperience(doc, d.experience, M, W,
       { title: "Inter-SemiBold", body: "Inter", meta: "Inter-Italic", bullet: "Inter" },
@@ -60,7 +60,7 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
     pageBreak(doc, 40);
     doc.font("NotoSerif-Bold").fontSize(10.5).fillColor(DARK)
       .text("EDUCATION", M, doc.y, { width: W });
-    hr(doc, M, doc.y + 3, W, "#cccccc", 0.3);
+    hr(doc, M, doc.y + 3, W, DARK, 0.3);
     doc.y += 8;
     renderEducation(doc, d.education, M, W,
       { title: "Inter-SemiBold", body: "Inter", meta: "Inter-Italic" },
@@ -74,7 +74,7 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
     pageBreak(doc, 40);
     doc.font("NotoSerif-Bold").fontSize(10.5).fillColor(DARK)
       .text("SKILLS", M, doc.y, { width: W });
-    hr(doc, M, doc.y + 3, W, "#cccccc", 0.3);
+    hr(doc, M, doc.y + 3, W, DARK, 0.3);
     doc.y += 8;
     renderSkillsGrid(doc, d.skills, M, W, "Inter", "#333333");
     doc.y += 10;
@@ -85,7 +85,7 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
     pageBreak(doc, 40);
     doc.font("NotoSerif-Bold").fontSize(10.5).fillColor(DARK)
       .text("PROJECTS", M, doc.y, { width: W });
-    hr(doc, M, doc.y + 3, W, "#cccccc", 0.3);
+    hr(doc, M, doc.y + 3, W, DARK, 0.3);
     doc.y += 8;
     renderProjects(doc, d.projects, M, W,
       { title: "Inter-SemiBold", body: "Inter", bullet: "Inter" },

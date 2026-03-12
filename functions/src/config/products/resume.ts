@@ -27,6 +27,7 @@ export const resumeProduct: ProductConfig = {
     { key: "email",       type: "text", required: false, label: "Email address" },
     { key: "phone",       type: "text", required: false, label: "Phone number" },
     { key: "address",     type: "text", required: false, label: "Location / address" },
+    { key: "primaryColor", type: "text", required: false, label: "Primary color (hex e.g. #1a2744)" },
   ],
   useCases,
   confirmationTemplate: (data) =>

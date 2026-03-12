@@ -1,5 +1,5 @@
 import {
-  PW, pageBreak, hr, parseResumeData,
+  PW, pageBreak, hr, parseResumeData, getPrimaryColor,
   renderExperience, renderEducation, renderSkillsGrid, renderProjects,
 } from "./helpers";
 
@@ -7,7 +7,7 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
   const d = parseResumeData(data);
   const M = 55;
   const W = PW - M * 2;
-  const NAVY = "#1a2744";
+  const NAVY = getPrimaryColor(d, "#1a2744");
 
   // Name (bold, uppercase, centered, serif)
   doc.font("NotoSerif-Bold").fontSize(22).fillColor(NAVY)

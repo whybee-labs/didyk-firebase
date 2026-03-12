@@ -4,7 +4,7 @@ import PDFDocument from "pdfkit";
 import { resumeTemplates } from "services/documents/templateRegistry";
 import { ResumeData } from "services/documents/templates/resume/helpers";
 
-function registerFonts(doc: PDFKit.PDFDocument): void {
+export function registerFonts(doc: PDFKit.PDFDocument): void {
   const dir = path.resolve(process.cwd(), "fonts");
   doc.registerFont("Inter",           path.join(dir, "Inter-Regular.otf"));
   doc.registerFont("Inter-Medium",    path.join(dir, "Inter-Medium.otf"));
@@ -16,9 +16,10 @@ function registerFonts(doc: PDFKit.PDFDocument): void {
   doc.registerFont("NotoSerif-Italic", path.join(dir, "NotoSerif-Italic.ttf"));
 }
 
-const SAMPLE_DATA: ResumeData = {
+export const SAMPLE_DATA: ResumeData = {
   fullName: "Samantha Williams",
   targetRole: "Senior Business Analyst",
+  // primaryColor: "#1a2744", // optional: uncomment to override template default (hex e.g. #1a2744)
   summary:
     "Results-driven Senior Business Analyst with 12+ years of experience transforming complex data into actionable business strategies. Proven track record of driving $4M+ in annual savings through process optimization, predictive modeling, and cross-functional stakeholder alignment. Adept at leading analytics teams, building executive dashboards, and translating technical findings into clear recommendations for C-suite leadership.",
   email: "samantha.williams@example.com",
@@ -184,5 +185,7 @@ async function main() {
   console.log("\nDone. Open preview/index.html to browse.");
 }
 
-// eslint-disable-next-line @typescript-eslint/no-floating-promises
-main();
+if (typeof require !== "undefined" && require.main === module) {
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+  main();
+}
