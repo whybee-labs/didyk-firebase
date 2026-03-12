@@ -35,7 +35,7 @@ startFulfillment(phone, conversation)
 
 ---
 
-## Generator Stubs
+## Generators
 
 **Location:** `services/generators/`
 
@@ -46,15 +46,46 @@ Each generator is a function:
 - For media types: returns a publicly accessible URL (hosted on Firebase Storage, CDN, etc.)
 - For `text` type: returns the message string to send
 
-| Generator | File | Current stub |
-|-----------|------|-------------|
-| `generateVideo` | `videoGenerator.ts` | Google sample MP4 |
-| `generateImage` | `imageGenerator.ts` | placehold.co 1280×720 |
-| `generatePdf` | `pdfGenerator.ts` | W3C sample PDF |
-| `generateAudio` | `audioGenerator.ts` | W3C sample MP3 |
-| `generateText` | `textGenerator.ts` | OpenAI `gpt-4.1-nano` generates personalized message |
+| Generator | File | Status |
+|-----------|------|--------|
+| `generateVideo` | `videoGenerator.ts` | Stub — Google sample MP4 |
+| `generateImage` | `imageGenerator.ts` | Stub — placehold.co 1280×720 |
+| `generatePdf` | `pdfGenerator.ts` | **Real** — pdfkit + Firebase Storage |
+| `generateAudio` | `audioGenerator.ts` | Stub — W3C sample MP3 |
+| `generateText` | `textGenerator.ts` | **Real** — Groq LLM generates personalized message |
 
-The `data` argument is `conversation.collectedData` — it contains all fields collected during the conversation (text fields from the form + media IDs from the LLM phase).
+The `data` argument is `conversation.collectedData` — it contains all fields collected during the conversation.
+
+### PDF Generator
+
+`pdfGenerator.ts` is a single adapter boundary. It:
+1. Reads `data._template` to select a template (default: `"modern"`)
+2. Reads `data._watermark` — `false` skips watermark for final post-payment delivery (default: `true`)
+3. Renders via pdfkit using the template registry
+4. Uploads to Firebase Storage → returns a download token URL
+
+**Template registry:** `services/documents/templateRegistry.ts` maps template name → render function.
+
+**Templates** (`services/documents/templates/`):
+
+| Template key | File | Used by |
+|---|---|---|
+| `modern` | `resume/modern.ts` | Resume — two-column, blue header |
+| `minimal` | `resume/minimal.ts` | Resume — single-column, ATS-friendly |
+| `event-invite` | `events/event-invite.ts` | Events, parties |
+| `birthday-invite` | `birthday/birthday-invite.ts` | Birthday, wedding invites |
+| `business-promo` | `business/business-promo.ts` | Flyers, posters, brochures |
+
+**Adding a new template:** create a file in the right subfolder exporting `render(doc, data)`, add one line to `templateRegistry.ts`.
+
+**Template is passed via closure in product/catalog config:**
+```ts
+generate: (data) => generatePdf({ ...data, _template: "modern" })
+```
+
+**Storage:** uploaded to `documents/` folder in Firebase Storage bucket. Uses download token URLs (non-expiring, token-protected). Requires Firebase Storage to be enabled in the Firebase console.
+
+**To swap to a third-party PDF service:** replace only `pdfGenerator.ts`. Interface stays the same.
 
 ---
 
