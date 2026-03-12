@@ -1,43 +1,44 @@
 {
-  "welcome.body": "👋 Welcome to *Whybee*! I create personalised content for you.\n\nHere are some popular options — or browse the full catalog below 👇",
+  "welcome.body": "🙏🏻 Welcome to *Whybee*! I create personalised content for you.\n\nHere are some popular options — or browse the full catalog below 👇🏻",
   "welcome.browseAll.body": "📂 Browse categories:",
-  "welcome.browseAll.button": "Browse",
+  "welcome.browseAll.button": "🔍 Browse",
 
   "browse.category.header": "📂 *{label}*\nChoose a product:",
-  "browse.category.button": "Browse",
+  "browse.category.button": "🔍 Browse",
   "browse.product.header": "📦 *{label}*\nWhat would you like created?",
-  "browse.product.button": "Choose",
+  "browse.product.button": "✨ Choose",
 
-  "usecase.body": "Amazing! Pick the style you'd love for your {productName} 👇",
-  "usecase.button": "Choose",
+  "usecase.body": "✨ Amazing! Pick the style you'd love for your {productName} 👇🏻",
+  "usecase.button": "✨ Choose",
 
-  "confirm.prompt": "Does this look right?",
-  "confirm.createButton": "✅ Create it!",
-  "confirm.restartButton": "🔄 Start Over",
-  "confirm.nudge": "Tap one of the buttons above to continue.",
+  "confirm.prompt": "🧐 Does this look right?",
+  "confirm.createButton": "✅ Looks good!",
+  "confirm.editButton": "✏️ Edit details",
+  "confirm.nudge": "👆🏻 Tap one of the buttons above to continue.",
+  "confirm.editPrompt": "✏️ What would you like to change? Just tell me and I'll update it right away.",
 
-  "form.required": "Please complete the form first, then we can continue! 📋",
-  "form.photo.progress": "Got it! ({current}/{max}) Send more photos or type *done* when ready.",
-  "form.photo.done": "Perfect, that's all the photos we need!",
-  "form.photo.required": "Please send at least one photo first.",
-  "form.photo.request": "Now send your photos (1–3), then type *done* when you're ready 📸",
+  "form.required": "📋 Please complete the form first, then we can continue!",
+  "form.photo.progress": "📸 Got it! ({current}/{max}) Send more photos or type *done* when ready.",
+  "form.photo.done": "✅ Perfect, that's all the photos we need!",
+  "form.photo.required": "📸 Please send at least one photo first.",
+  "form.photo.request": "📸 Now send your photos (1–3), then type *done* when you're ready.",
 
-  "form.followup.single": "One more thing — {field}?",
-  "form.followup.many": "Almost there! Still need: {fields}.",
+  "form.followup.single": "💬 One more thing — {field}?",
+  "form.followup.many": "💬 Almost there! Still need: {fields}.",
 
   "fulfillment.preview": "🎬 Here's your preview!",
-  "fulfillment.payment": "Happy with your preview? Your final file — clean, crisp, and watermark-free — will arrive right here on WhatsApp the moment you pay 🎉",
-  "fulfillment.paymentButton": "Pay {symbol}{amount} instantly",
+  "fulfillment.payment": "🎉 Happy with your preview? Your final file — clean, crisp, and watermark-free — will arrive right here on WhatsApp the moment you pay.",
+  "fulfillment.paymentButton": "💳 Pay {symbol}{amount} instantly",
   "fulfillment.delivering": "🎉 Thank you so much! Your file is on its way — we hope it's everything you imagined. Wishing you all the very best 💫",
 
   "status.generating": "⏳ Still working on it, hang tight!",
   "status.awaitingPayment": "💳 Please complete your payment using the link sent above.",
 
-  "errors.generic": "Something went wrong. Please try again.",
+  "errors.generic": "😔 Something went wrong. Please try again.",
   "errors.outputFailed": "⚠️ Something went wrong generating your file. Please contact support.",
 
-  "feedback.prompt": "How did we do? 🙏",
-  "feedback.commentPrompt": "Thanks! Any suggestions for us? (or just say *skip*)",
-  "feedback.thanks": "💙 Thank you! Your feedback means a lot.",
-  "feedback.skip": "👋 No worries! Enjoy your content."
+  "feedback.prompt": "🙏🏻 How did we do?",
+  "feedback.commentPrompt": "💬 Thanks! Any suggestions for us? (or just say *skip*)",
+  "feedback.thanks": "💙 Thank you so much — your feedback truly means the world to us. We hope to create something special for you again soon 🌟",
+  "feedback.skip": "👋🏻 No worries! Enjoy your content — we'd love to have you back anytime 🌟"
 }

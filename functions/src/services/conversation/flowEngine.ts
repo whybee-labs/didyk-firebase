@@ -6,7 +6,7 @@ import { callOpenAI } from "services/llm/openai";
 import { getProductConfig, UseCase } from "config/products";
 import { ProductField } from "config/products/types";
 import { Conversation, HistoryEntry } from "services/conversation/handleIncomingMessage";
-import { sendUseCaseSelection } from "services/conversation/useCaseSelection";
+import { sendConfirmation } from "services/conversation/confirmation";
 import { t } from "utils/t";
 
 const MAX_HISTORY_PAIRS = 5;
@@ -16,7 +16,7 @@ function trimHistory(history: HistoryEntry[]): HistoryEntry[] {
 }
 
 async function onFormComplete(phone: string, conversation: Conversation): Promise<void> {
-  await sendUseCaseSelection(phone, conversation);
+  await sendConfirmation(phone, conversation);
 }
 
 export async function flowEngine(

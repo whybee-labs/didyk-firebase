@@ -5,7 +5,7 @@ import { sendList } from "services/whatsapp/sendList";
 import { getProductConfig, UseCase } from "config/products";
 import { findProduct, findUseCase } from "config/catalog";
 import { Conversation } from "services/conversation/handleIncomingMessage";
-import { sendConfirmation } from "services/conversation/confirmation";
+import { startFulfillment } from "services/conversation/fulfillment";
 import { t } from "utils/t";
 
 export async function sendUseCaseSelection(phone: string, conversation: Conversation): Promise<void> {
@@ -60,13 +60,11 @@ export async function handleUseCaseSelection(
 
   await db.collection("conversations").doc(conversation.conversationId).update({
     selectedUseCaseIds: [message.listId],
-    status: "confirming",
     updatedAt: new Date(),
   });
 
-  await sendConfirmation(phone, {
+  await startFulfillment(phone, {
     ...conversation,
     selectedUseCaseIds: [message.listId],
-    status: "confirming",
   });
 }
