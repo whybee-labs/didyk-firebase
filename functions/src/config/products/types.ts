@@ -4,6 +4,7 @@ export interface ProductField {
   required: boolean;
   label: string;       // shown in LLM prompts + confirmation summary
   formKey?: string;    // maps to nfm_reply response_json field name
+  schema?: string;     // JSON schema example for structured fields (guides LLM extraction)
 }
 
 export type OutputType = "video" | "image" | "pdf" | "audio" | "text";

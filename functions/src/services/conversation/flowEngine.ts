@@ -161,7 +161,8 @@ async function extractWithLLM(
     .filter((f) => f.type === "text")
     .map((f) => {
       const val = collectedData[f.key];
-      return `- ${f.key} (${f.label}): ${val ?? "NOT FILLED"}`;
+      const schemaHint = f.schema ? ` [schema: ${f.schema}]` : "";
+      return `- ${f.key} (${f.label})${schemaHint}: ${val ?? "NOT FILLED"}`;
     })
     .join("\n");
 
@@ -173,7 +174,10 @@ Based on the conversation history and the latest user message, extract any field
 Only extract values for the listed fields. Ignore anything not in the list.
 Use the conversation history to infer which field an ambiguous reply is answering.
 
-Respond ONLY in JSON: { "extractedFields": { "fieldKey": "value" } }
+For fields marked with [schema: ...], extract as a JSON array matching the schema — reformat and structure the user's input, do not preserve raw text.
+For plain text fields (no schema), extract as a plain string.
+
+Respond ONLY in JSON: { "extractedFields": { "fieldKey": value } }
 If nothing can be extracted, respond with: { "extractedFields": {} }`;
 
   try {

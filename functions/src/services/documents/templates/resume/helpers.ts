@@ -78,6 +78,7 @@ export function parseResumeData(raw: Record<string, unknown>): ResumeData {
 
 function parseExperience(val: unknown): ResumeJob[] | undefined {
   if (!val) return undefined;
+  if (!Array.isArray(val) && typeof val === "object") return [val as ResumeJob];
   if (Array.isArray(val) && val.length > 0 && typeof val[0] === "object") {
     return val as ResumeJob[];
   }
@@ -94,6 +95,7 @@ function parseExperience(val: unknown): ResumeJob[] | undefined {
 
 function parseEducation(val: unknown): ResumeEducation[] | undefined {
   if (!val) return undefined;
+  if (!Array.isArray(val) && typeof val === "object") return [val as ResumeEducation];
   if (Array.isArray(val) && val.length > 0 && typeof val[0] === "object") {
     return val as ResumeEducation[];
   }
@@ -113,6 +115,7 @@ function parseSkills(val: unknown): string[] | undefined {
 
 function parseProjects(val: unknown): ResumeProject[] | undefined {
   if (!val) return undefined;
+  if (!Array.isArray(val) && typeof val === "object") return [val as ResumeProject];
   if (Array.isArray(val) && val.length > 0 && typeof val[0] === "object") {
     return val as ResumeProject[];
   }
