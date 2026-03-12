@@ -18,9 +18,9 @@ export async function sendFeedbackRequest(conversationId: string, phone: string)
   });
 
   await sendButtons(conversationId, phone, t("feedback.prompt"), [
-    { id: "fb-excellent", title: "🔥 Excellent!" },
-    { id: "fb-good",      title: "👍 Pretty good" },
-    { id: "fb-poor",      title: "👎 Needs work" },
+    { id: "fb-excellent", title: t("feedback.button.excellent") },
+    { id: "fb-good",      title: t("feedback.button.good") },
+    { id: "fb-poor",      title: t("feedback.button.poor") },
   ]);
 }
 

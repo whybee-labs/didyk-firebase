@@ -172,7 +172,7 @@ export const catalog: CatalogCategory[] = [
     products: [
       {
         id: "prod-student-resume",
-        label: "📄 Student Resume",
+        label: "📄 Resume",
         description: "Land your next internship or job",
         popular: true,
         productConfigId: "resume",
