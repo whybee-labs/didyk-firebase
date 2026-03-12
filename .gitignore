@@ -15,5 +15,8 @@ functions/node_modules/
 .env
 .env.*
 
+# Preview — generated PDFs are build artifacts, not committed
+functions/preview/*.pdf
+
 # OS
 .DS_Store

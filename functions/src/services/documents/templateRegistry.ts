@@ -1,5 +1,4 @@
 import { render as astralis }        from "./templates/resume/astralis";
-import { render as pulsar }          from "./templates/resume/pulsar";
 import { render as eclipse }         from "./templates/resume/eclipse";
 import { render as comet }           from "./templates/resume/comet";
 import { render as nebula }          from "./templates/resume/nebula";
@@ -19,7 +18,6 @@ export type TemplateFn = (doc: PDFKit.PDFDocument, data: Record<string, unknown>
 
 export const resumeTemplates: Record<string, { render: TemplateFn; label: string; description: string }> = {
   astralis:  { render: astralis,  label: "Astralis",  description: "Two-column with green accent and skill badges" },
-  pulsar:    { render: pulsar,    label: "Pulsar",     description: "Full pale-green background, modern and bold" },
   eclipse:   { render: eclipse,   label: "Eclipse",    description: "Clean single-column with centered serif name" },
   comet:     { render: comet,     label: "Comet",      description: "Yellow header band with black badge labels" },
   nebula:    { render: nebula,    label: "Nebula",     description: "Navy header block with light sidebar" },

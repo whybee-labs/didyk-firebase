@@ -5,7 +5,6 @@ import { generateText } from "services/generators/textGenerator";
 import { birthdayProduct } from "config/products/birthday";
 import { businessProduct } from "config/products/business";
 import { eventProduct } from "config/products/event";
-import { resumeProduct } from "config/products/resume";
 import { CatalogCategory, CatalogProduct, CatalogUseCase } from "./types";
 
 export const catalog: CatalogCategory[] = [
@@ -256,7 +255,16 @@ export const catalog: CatalogCategory[] = [
         description: "Land your next internship or job",
         popular: true,
         productConfigId: "resume",
-        useCases: resumeProduct.useCases,
+        useCases: [
+          { id: "uc-resume-astralis",  label: "Astralis",  description: "Two-column, green accent, skill badges",      outputs: [{ type: "pdf" as const, generate: (data) => generatePdf({ ...data, _template: "astralis" }) }] },
+          { id: "uc-resume-nebula",    label: "Nebula",    description: "Navy header with a clean light sidebar",      outputs: [{ type: "pdf" as const, generate: (data) => generatePdf({ ...data, _template: "nebula" }) }] },
+          { id: "uc-resume-celestial", label: "Celestial", description: "Full-height navy sidebar, white main area",   outputs: [{ type: "pdf" as const, generate: (data) => generatePdf({ ...data, _template: "celestial" }) }] },
+          { id: "uc-resume-cosmos",    label: "Cosmos",    description: "Dark charcoal header, single-column body",    outputs: [{ type: "pdf" as const, generate: (data) => generatePdf({ ...data, _template: "cosmos" }) }] },
+          { id: "uc-resume-aurora",    label: "Aurora",    description: "Pink/blush gradient header, two-column",      outputs: [{ type: "pdf" as const, generate: (data) => generatePdf({ ...data, _template: "aurora" }) }] },
+          { id: "uc-resume-eclipse",   label: "Eclipse",   description: "Single-column, centered serif name",          outputs: [{ type: "pdf" as const, generate: (data) => generatePdf({ ...data, _template: "eclipse" }) }] },
+          { id: "uc-resume-solstice",  label: "Solstice",  description: "Ultra-minimal, serif, no color",              outputs: [{ type: "pdf" as const, generate: (data) => generatePdf({ ...data, _template: "solstice" }) }] },
+          { id: "uc-resume-ats",       label: "ATS",       description: "Single-column, ATS-optimised for job apps",   outputs: [{ type: "pdf" as const, generate: (data) => generatePdf({ ...data, _template: "ats" }) }] },
+        ],
       },
     ],
   },
