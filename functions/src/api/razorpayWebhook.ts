@@ -121,6 +121,9 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
     updatedAt: new Date(),
   });
 
+  // Delay so WhatsApp finishes delivering the file before the feedback prompt appears
+  await new Promise((resolve) => setTimeout(resolve, 4000));
+
   // Ask for feedback — this also sets status to "awaiting_feedback"
   await sendFeedbackRequest(conversationId, phone);
 
