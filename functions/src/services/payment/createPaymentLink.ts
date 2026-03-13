@@ -27,7 +27,7 @@ export async function createPaymentLink(
     reference_id: `${conversationId}-${Date.now()}`,
     notify: { sms: false, email: false },
     reminder_enable: false,
-    ...(isOwner(phone) && offerId ? { offer_id: offerId } : {}),
+    ...(isOwner(phone) && offerId ? { options: { order: { offers: [offerId] } } } : {}),
   });
 
   return { id: link.id, shortUrl: link.short_url };
