@@ -9,6 +9,7 @@ import { sendAudio } from "services/whatsapp/sendAudio";
 import { getProductConfig, UseCase } from "config/products";
 import { OutputType } from "config/products/types";
 import { findUseCase } from "config/catalog";
+import { templateKeyFromUseCaseId, getResumeColorConfig, textColorForBackground } from "config/resumeColors";
 import { createPaymentLink } from "services/payment/createPaymentLink";
 import { Conversation } from "services/conversation/handleIncomingMessage";
 import { t } from "utils/t";
@@ -23,16 +24,50 @@ export async function startFulfillment(phone: string, conversation: Conversation
 
   const config = getProductConfig(conversation.useCase as UseCase);
   const cid = conversation.conversationId;
+  const isResume = conversation.useCase === "resume";
 
-  await sendText(cid, phone, t("fulfillment.preview"));
+  const dataForGenerate = { ...conversation.collectedData };
+  if (isResume && dataForGenerate.firstName != null && dataForGenerate.lastName != null && !dataForGenerate.fullName) {
+    dataForGenerate.fullName = [dataForGenerate.firstName, dataForGenerate.lastName].join(" ").trim();
+  }
+  if (isResume && conversation.selectedPrimaryColor) {
+    const ucId = conversation.selectedUseCaseIds?.[0];
+    const templateKey = ucId ? templateKeyFromUseCaseId(ucId) : "";
+    const colorConfig = getResumeColorConfig(templateKey);
+    const hex = conversation.selectedPrimaryColor;
+    if (colorConfig?.mode === "background") {
+      dataForGenerate.backgroundColor = hex;
+      dataForGenerate.primaryColor = textColorForBackground(hex);
+    } else {
+      dataForGenerate.primaryColor = hex;
+    }
+  }
 
-  // Generate and send outputs for each selected use case
-  for (const ucId of conversation.selectedUseCaseIds ?? []) {
-    const uc = findUseCase(ucId);
-    if (!uc?.outputs) continue;
-    for (const output of uc.outputs) {
-      const result = await output.generate({ ...conversation.collectedData, _phone: phone, _conversationId: cid });
-      await dispatchOutput(cid, phone, output.type, result);
+  if (!isResume) {
+    await sendText(cid, phone, t("fulfillment.preview"));
+    for (const ucId of conversation.selectedUseCaseIds ?? []) {
+      const uc = findUseCase(ucId);
+      if (!uc?.outputs) continue;
+      for (const output of uc.outputs) {
+        const result = await output.generate({ ...dataForGenerate, _phone: phone, _conversationId: cid });
+        await dispatchOutput(cid, phone, output.type, result);
+      }
+    }
+  } else {
+    // Resume: send preview PDF (with watermark) then payment CTA
+    await sendText(cid, phone, t("fulfillment.previewResume"));
+    const ucId = conversation.selectedUseCaseIds?.[0];
+    const uc = ucId ? findUseCase(ucId) : null;
+    if (uc?.outputs) {
+      for (const output of uc.outputs) {
+        const result = await output.generate({
+          ...dataForGenerate,
+          _phone: phone,
+          _conversationId: cid,
+          _watermark: true,
+        });
+        await dispatchOutput(cid, phone, output.type, result, "resume_preview.pdf");
+      }
     }
   }
 
@@ -54,12 +89,18 @@ export async function startFulfillment(phone: string, conversation: Conversation
   });
 }
 
-async function dispatchOutput(conversationId: string, phone: string, type: OutputType, value: string): Promise<void> {
+async function dispatchOutput(
+  conversationId: string,
+  phone: string,
+  type: OutputType,
+  value: string,
+  documentFilename?: string
+): Promise<void> {
   switch (type) {
-    case "video":    return sendVideo(conversationId, phone, value);
-    case "image":    return sendImage(conversationId, phone, value);
-    case "pdf":      return sendDocument(conversationId, phone, value, "whybee.pdf");
-    case "audio":    return sendAudio(conversationId, phone, value);
-    case "text":     return sendText(conversationId, phone, value);
+    case "video":  return sendVideo(conversationId, phone, value);
+    case "image":  return sendImage(conversationId, phone, value);
+    case "pdf":    return sendDocument(conversationId, phone, value, documentFilename ?? "whybee.pdf");
+    case "audio":  return sendAudio(conversationId, phone, value);
+    case "text":   return sendText(conversationId, phone, value);
   }
 }

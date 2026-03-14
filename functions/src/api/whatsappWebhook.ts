@@ -56,6 +56,8 @@ async function handleIncoming(req: Request, res: Response): Promise<void> {
   try {
     await handleIncomingMessage(parsed.phone, parsed);
   } catch (err) {
-    logger.error("Error handling incoming message", { err });
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    logger.error("Error handling incoming message", { message, stack });
   }
 }

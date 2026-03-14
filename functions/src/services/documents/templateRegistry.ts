@@ -9,6 +9,7 @@ import { render as astral }          from "./templates/resume/astral";
 import { render as lunar }           from "./templates/resume/lunar";
 import { render as aurora }          from "./templates/resume/aurora";
 import { render as solstice }        from "./templates/resume/solstice";
+import { render as pulsar }          from "./templates/resume/pulsar";
 import { render as ats }             from "./templates/resume/ats";
 import { render as eventInvite }     from "./templates/events/event-invite";
 import { render as eventModern }     from "./templates/events/event-modern";
@@ -35,6 +36,7 @@ export const resumeTemplates: Record<string, { render: TemplateFn; label: string
   lunar:     { render: lunar,     label: "Lunar",     description: "Boxed name header, sidebar details, clean layout" },
   aurora:    { render: aurora,    label: "Aurora",    description: "Pink/blush gradient header, two-column body" },
   solstice:  { render: solstice,  label: "Solstice",  description: "Ultra-minimal serif, centered, no color" },
+  pulsar:    { render: pulsar,    label: "Pulsar",   description: "Pale-green background, modern single-column" },
   ats:       { render: ats,       label: "ATS",       description: "Single-column, standard headings, ATS-optimized" },
 };
 

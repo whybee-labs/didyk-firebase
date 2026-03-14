@@ -89,8 +89,13 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
   }
 
   const phone = convData?.phone as string;
+  const useCase = convData?.useCase as string | undefined;
   const selectedUseCaseIds: string[] = convData?.selectedUseCaseIds ?? [];
-  const collectedData: Record<string, unknown> = convData?.collectedData ?? {};
+  const collectedData: Record<string, unknown> = { ...(convData?.collectedData ?? {}) };
+  if (useCase === "resume" && !collectedData.fullName && (collectedData.firstName != null || collectedData.lastName != null)) {
+    collectedData.fullName = [collectedData.firstName, collectedData.lastName].filter(Boolean).join(" ").trim();
+  }
+  const pdfFilename = useCase === "resume" ? `${sanitizeResumeFilename(collectedData.fullName)}_resume.pdf` : undefined;
 
   await sendText(conversationId, phone, t("fulfillment.delivering"));
 
@@ -107,7 +112,7 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
           _phone: phone,
           _conversationId: conversationId,
         });
-        await dispatchOutput(conversationId, phone, output.type, result);
+        await dispatchOutput(conversationId, phone, output.type, result, pdfFilename);
       } catch (err) {
         allSucceeded = false;
         logger.error("Output generation failed", { ucId, type: output.type, err });
@@ -130,11 +135,23 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
   logger.info("Payment confirmed, outputs dispatched", { conversationId, phone, allSucceeded });
 }
 
-async function dispatchOutput(conversationId: string, phone: string, type: OutputType, value: string): Promise<void> {
+function sanitizeResumeFilename(fullName: unknown): string {
+  if (fullName == null || typeof fullName !== "string") return "resume";
+  const s = fullName.trim().replace(/\s+/g, "_").replace(/[/\\:*?"<>|]/g, "");
+  return (s || "resume").slice(0, 80);
+}
+
+async function dispatchOutput(
+  conversationId: string,
+  phone: string,
+  type: OutputType,
+  value: string,
+  pdfFilename?: string
+): Promise<void> {
   switch (type) {
     case "video":  return sendVideo(conversationId, phone, value);
     case "image":  return sendImage(conversationId, phone, value);
-    case "pdf":    return sendDocument(conversationId, phone, value, "whybee.pdf");
+    case "pdf":    return sendDocument(conversationId, phone, value, pdfFilename ?? "whybee.pdf");
     case "audio":  return sendAudio(conversationId, phone, value);
     case "text":   return sendText(conversationId, phone, value);
   }

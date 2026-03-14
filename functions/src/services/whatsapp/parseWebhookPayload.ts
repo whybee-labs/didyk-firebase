@@ -2,7 +2,7 @@ export interface ParsedMessage {
   phone: string;
   messageId: string;
   timestamp: string;
-  type: "text" | "image" | "video" | "audio" | "button_reply" | "list_reply" | "form_reply" | "unknown";
+  type: "text" | "image" | "video" | "audio" | "document" | "button_reply" | "list_reply" | "form_reply" | "unknown";
   text?: string;
   mediaId?: string;
   buttonId?: string;
@@ -40,6 +40,9 @@ export function parseWebhookPayload(payload: unknown): ParsedMessage | null {
 
     case "audio":
       return { ...base, type: "audio", mediaId: message.audio?.id };
+
+    case "document":
+      return { ...base, type: "document", mediaId: message.document?.id };
 
     case "interactive": {
       const interactive = message.interactive;

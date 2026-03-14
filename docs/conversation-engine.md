@@ -21,10 +21,13 @@ lastSeenAt           Timestamp
 ```
 phone                string
 status               ConversationStatus
-useCase              "birthday" | "business" | "event" | undefined
+useCase              "birthday" | "business" | "event" | "resume" | undefined
 collectedData        Record<string, unknown>   — user-provided form inputs + media IDs
 browsePath           string[]                  — navigation trail (e.g. ["cat-memories", "prod-birthdays"])
+selectedFilters      { withPhoto?: "yes"|"no"|"both" } — resume only: filter before sample list
 selectedUseCaseIds   string[]                  — use case IDs chosen at selecting_usecases step
+selectedPrimaryColor string                    — resume: chosen colour (hex) for template
+inputMethod         "upload" | "scratch"       — resume: upload PDF vs build from scratch
 paymentData          { linkId, amount, createdAt, paidAt? } — set during fulfillment
 lastMessageAt        Timestamp  — updated on every incoming message (used for idle timeout)
 createdAt            Timestamp
@@ -39,21 +42,33 @@ updatedAt            Timestamp
 
 ```
             ┌──────────────┐
-  new user  │   discovery  │  ← welcome: popular buttons + browse list
+  new user  │   discovery  │  ← welcome: popular buttons + browse list (only Resume is live; others "Coming soon")
             └──────┬───────┘
-                   │ popular product button tapped, or category selected from list
+                   │ popular product or category selected from list
             ┌──────▼───────┐
-            │   browsing   │  ← navigating catalog: category → product → use case
+            │   browsing   │  ← navigating catalog: category → product (only Resume continues)
             └──────┬───────┘
-                   │ product selected
-            ┌──────▼───────┐
-            │   refining   │  ← LLM collecting fields conversationally (photos, text)
-            └──────┬───────┘
-                   │ all fields complete
+                   │ Resume selected → sample image + template list (no filter step)
             ┌──────▼────────────┐
-            │ selecting_usecases│  ← "What would you like created?" list
+            │ selecting_usecases│  ← resume: pick one of 10 templates; others: "What would you like created?"
             └──────┬────────────┘
                    │ use case selected
+            ┌──────▼────────────┐
+            │ selecting_color  │  ← resume only: bg-mode (background options) or text-mode (accent options) list
+            └──────┬────────────┘
+                   │ colour chosen
+            ┌──────▼────────────────┐
+            │ choose_input_method   │  ← resume only: [Upload your PDF] [Build from scratch] buttons
+            └──────┬────────────────┘
+                   │ "Build from scratch" → refining; "Upload your PDF" → waiting_for_pdf
+            ┌──────▼──────────────┐
+            │ waiting_for_pdf     │  ← resume only: user sends document; we parse (pdf-parse + LLM), prefill, → refining
+            └──────┬──────────────┘
+                   │ PDF parsed and summary sent (or scratch chosen)
+            ┌──────▼───────┐
+            │   refining   │  ← LLM collecting fields / edits (resume: name+role required; optional/skip; add/remove/replace)
+            └──────┬───────┘
+                   │ required fields complete
             ┌──────▼───────┐
             │  confirming  │  ← summary + [✅ Create it!] [🔄 Start Over] buttons
             └──────┬───────┘
@@ -84,7 +99,7 @@ Note: `form_sent` is a legacy status for WhatsApp Form (nfm_reply) submissions. 
 
 `handleIncomingMessage.ts` is the entry point for every message.
 
-1. **"hi" shortcut** — if the message text is exactly `"hi"`, reset the conversation to `discovery` regardless of current status (clears `useCase`, `collectedData`, `browsePath`, `selectedUseCaseIds`, `messageHistory`)
+1. **"hi" shortcut** — if the message text is exactly `"hi"`, reset the conversation to `discovery` regardless of current status (clears `useCase`, `collectedData`, `browsePath`, `selectedUseCaseIds`, `selectedPrimaryColor`, `inputMethod`, `messageHistory`)
 2. **Load conversation** — look up `users/{phone}` → get `activeConversationId` → load `conversations/{activeConversationId}`
 3. **Create if needed** — create a new conversation (status `"discovery"`) if:
    - no `activeConversationId` on the user, or
@@ -97,15 +112,18 @@ Note: `form_sent` is a legacy status for WhatsApp Form (nfm_reply) submissions. 
 
 ```ts
 switch (conversation.status) {
-  case "discovery":           → discovery()
-  case "browsing":            → browsing()
-  case "form_sent":           → handleFormReply()
-  case "refining":            → flowEngine()
-  case "selecting_usecases":  → handleUseCaseSelection()
-  case "confirming":          → handleConfirmation()
-  case "generating":          → "Still working on it, hang tight!"
-  case "awaiting_payment":    → "Please complete your payment using the link sent above."
-  default:                    → discovery()
+  case "discovery":             → discovery()
+  case "browsing":              → browsing()
+  case "form_sent":             → handleFormReply()
+  case "refining":              → flowEngine()
+  case "selecting_usecases":    → handleUseCaseSelection()
+  case "selecting_color":       → handleColorSelection() / sendResumeColorOptions()  // resume: colour list
+  case "choose_input_method":   → handleInputMethodSelection() / sendInputMethodPrompt()  // resume: Upload vs Scratch
+  case "waiting_for_pdf":       → handleResumePdfUpload() on document; else nudge  // resume: parse PDF, prefill
+  case "confirming":            → handleConfirmation()
+  case "generating":            → "Still working on it, hang tight!"
+  case "awaiting_payment":      → "Please complete your payment using the link sent above."
+  default:                      → discovery()
 }
 ```
 

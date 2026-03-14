@@ -1,26 +1,27 @@
 import {
-  PW, pageBreak, parseResumeData, getPrimaryColor,
+  PW, pageBreak, parseResumeData, getPrimaryColor, renderResumePhoto,
   renderExperience, renderEducation, renderSkillsPills, renderProjects,
 } from "./helpers";
 
+const DEFAULT_HEADER_BG = "#fdd835";
+
 export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): void {
   const d = parseResumeData(data);
-  const PRIMARY = getPrimaryColor(d, "#fdd835");
+  const headerBg = (data.backgroundColor as string) && /^#[0-9A-Fa-f]{6}$/.test(String(data.backgroundColor).trim())
+    ? String(data.backgroundColor).trim() : DEFAULT_HEADER_BG;
+  const textOnHeader = getPrimaryColor(d, "#1a1a1a");
   const BADGE_BG = "#1a1a1a";
   const BADGE_FG = "#ffffff";
   const M = 50;
   const W = PW - M * 2;
 
-  doc.rect(0, 0, PW, 125).fill(PRIMARY);
+  doc.rect(0, 0, PW, 125).fill(headerBg);
 
-  doc.circle(M + 40, 62, 38).fill("#e8e8e8");
-  doc.circle(M + 40, 62, 36).fill("#f5f5f5");
-  doc.font("Inter").fontSize(7).fillColor("#999999")
-    .text("PHOTO", M + 24, 58, { width: 32, align: "center" });
+  renderResumePhoto(doc, data, M + 40, 62, 36, "#e8e8e8", "#f5f5f5", -4);
 
-  doc.font("Inter-Bold").fontSize(24).fillColor("#1a1a1a")
+  doc.font("Inter-Bold").fontSize(24).fillColor(textOnHeader)
     .text(d.fullName, M + 90, 28, { width: W - 95 });
-  doc.font("Inter").fontSize(10).fillColor("#444444")
+  doc.font("Inter").fontSize(10).fillColor(textOnHeader)
     .text(d.targetRole, M + 90, doc.y + 3, { width: W - 95 });
 
   doc.y = 140;
@@ -70,7 +71,7 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
 
   if (d.skills?.length) {
     badge("SKILLS");
-    renderSkillsPills(doc, d.skills, M, doc.y, W, PRIMARY, "#1a1a1a");
+    renderSkillsPills(doc, d.skills, M, doc.y, W, headerBg, textOnHeader);
     doc.y += 10;
   }
 

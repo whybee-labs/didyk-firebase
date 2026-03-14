@@ -152,6 +152,34 @@ export function hr(
     .restore();
 }
 
+/**
+ * Draw the resume photo circle: user's photo if data._photoBuffer is set, else placeholder.
+ * Used by photo-capable templates (Astral, Aurora, Nebula, Celestial, Astralis, Comet).
+ */
+export function renderResumePhoto(
+  doc: PDFKit.PDFDocument,
+  data: Record<string, unknown>,
+  cx: number,
+  cy: number,
+  radius: number,
+  placeholderOuter = "#e0e0e0",
+  placeholderInner = "#f0f0f0",
+  labelYOffset = 0,
+): void {
+  const buf = data._photoBuffer as Buffer | undefined;
+  if (buf && Buffer.isBuffer(buf)) {
+    doc.save();
+    doc.circle(cx, cy, radius).clip();
+    doc.image(buf, cx - radius, cy - radius, { width: radius * 2, height: radius * 2 });
+    doc.restore();
+    return;
+  }
+  doc.circle(cx, cy, radius + 2).fill(placeholderOuter);
+  doc.circle(cx, cy, radius).fill(placeholderInner);
+  doc.font("Inter").fontSize(7).fillColor("#999")
+    .text("PHOTO", cx - radius, cy - 6 + labelYOffset, { width: radius * 2, align: "center" });
+}
+
 // ── Shared section renderers (used by polished batch-1 templates) ────────────
 
 export function renderExperience(

@@ -1,5 +1,5 @@
 import {
-  PW, pageBreak, hr, parseResumeData, getPrimaryColor,
+  PW, pageBreak, hr, parseResumeData, getPrimaryColor, renderResumePhoto,
   renderExperience, renderEducation, renderSkillsList, renderProjects,
 } from "./helpers";
 
@@ -11,10 +11,7 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
   const W = PW - M * 2;
 
   // ── Header: photo circle + name ──
-  doc.circle(M + 40, 56, 36).fill("#e0e0e0");
-  doc.circle(M + 40, 56, 34).fill("#f0f0f0");
-  doc.font("Inter").fontSize(7).fillColor("#999")
-    .text("PHOTO", M + 24, 52, { width: 32, align: "center" });
+  renderResumePhoto(doc, data, M + 40, 56, 34, "#e0e0e0", "#f0f0f0", -4);
 
   const nameX = M + 90;
   doc.font("NotoSerif-Bold").fontSize(22).fillColor(NAVY)

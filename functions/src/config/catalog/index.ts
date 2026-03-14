@@ -6,6 +6,9 @@ import { birthdayProduct } from "config/products/birthday";
 import { businessProduct } from "config/products/business";
 import { CatalogCategory, CatalogProduct, CatalogUseCase } from "./types";
 
+/** Only this product is live; others show "Coming soon" */
+export const LIVE_PRODUCT_ID = "prod-student-resume";
+
 const pdf = (template: string) => (data: Record<string, unknown>) => generatePdf({ ...data, _template: template });
 
 export const catalog: CatalogCategory[] = [
@@ -177,14 +180,16 @@ export const catalog: CatalogCategory[] = [
         popular: true,
         productConfigId: "resume",
         useCases: [
-          { id: "uc-resume-astralis",  label: "Astralis",  description: "Two-column, green accent, skill badges",    pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("astralis") }] },
-          { id: "uc-resume-nebula",    label: "Nebula",    description: "Navy header with a clean light sidebar",    pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("nebula") }] },
-          { id: "uc-resume-celestial", label: "Celestial", description: "Full-height navy sidebar, white main area", pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("celestial") }] },
-          { id: "uc-resume-cosmos",    label: "Cosmos",    description: "Dark charcoal header, single-column body",  pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("cosmos") }] },
-          { id: "uc-resume-aurora",    label: "Aurora",    description: "Pink/blush gradient header, two-column",    pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("aurora") }] },
-          { id: "uc-resume-eclipse",   label: "Eclipse",   description: "Single-column, centered serif name",        pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("eclipse") }] },
-          { id: "uc-resume-solstice",  label: "Solstice",  description: "Ultra-minimal, serif, no color",            pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("solstice") }] },
-          { id: "uc-resume-ats",       label: "ATS",       description: "Single-column, ATS-optimised for job apps", pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("ats") }] },
+          { id: "uc-resume-lunar",    label: "Lunar",    description: "Boxed name header, sidebar, clean layout",    pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("lunar") }], supportsPhoto: false },
+          { id: "uc-resume-aurora",   label: "Aurora",   description: "Pink/blush gradient header, two-column",      pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("aurora") }], supportsPhoto: true },
+          { id: "uc-resume-nebula",   label: "Nebula",   description: "Navy header with a clean light sidebar",      pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("nebula") }], supportsPhoto: true },
+          { id: "uc-resume-cosmos",   label: "Cosmos",   description: "Dark charcoal header, single-column body",   pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("cosmos") }], supportsPhoto: false },
+          { id: "uc-resume-celestial", label: "Celestial", description: "Full-height navy sidebar, white main area", pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("celestial") }], supportsPhoto: true },
+          { id: "uc-resume-galaxy",   label: "Galaxy",   description: "Formal serif, centered headings and rules",   pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("galaxy") }], supportsPhoto: false },
+          { id: "uc-resume-astralis", label: "Astralis", description: "Two-column, green accent, skill badges",      pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("astralis") }], supportsPhoto: true },
+          { id: "uc-resume-pulsar",   label: "Pulsar",   description: "Pale-green background, modern layout",        pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("pulsar") }], supportsPhoto: false },
+          { id: "uc-resume-eclipse",  label: "Eclipse",  description: "Single-column, centered serif name",          pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("eclipse") }], supportsPhoto: false },
+          { id: "uc-resume-comet",   label: "Comet",    description: "Yellow header band, black badge labels",      pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("comet") }], supportsPhoto: false },
         ],
       },
     ],

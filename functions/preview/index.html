@@ -97,7 +97,7 @@
     <div class="top-bar">
       <div class="badge"><span class="badge-dot"></span> Template Gallery</div>
       <h1>Whybee Template Gallery</h1>
-      <span class="server-hint" id="server-hint">Open at <strong>http://localhost:4174</strong> for accent colors</span>
+      <span class="server-hint" id="server-hint">After design changes: run <code>npm run build && npm run preview:resumes</code> in functions/, then refresh. Optional: run <code>npm run preview:serve</code> and open http://localhost:4174 for accent color picker.</span>
       <div class="spacer"></div>
       <div class="actions">
         <button onclick="copyCmd()">Copy rebuild command</button>
@@ -110,7 +110,7 @@
       <div class="full-bar">
         <span class="name" id="full-name"></span>
         <div class="color-row" id="color-row">
-          <span class="label-accent">Accent color:</span>
+          <span class="label-accent" id="color-row-label">Accent color:</span>
           <div id="color-swatches"></div>
           <span class="gen-time" id="gen-time"></span>
         </div>
@@ -127,6 +127,7 @@
       const TEMPLATES = [
         // Resumes
         { key: "astralis",        label: "Astralis",          desc: "Two-column, green accent, skill badges" },
+        { key: "pulsar",          label: "Pulsar",            desc: "Pale-green background, modern layout" },
         { key: "eclipse",         label: "Eclipse",           desc: "Clean single-column, centered serif name" },
         { key: "comet",           label: "Comet",             desc: "Yellow header band, black badge labels" },
         { key: "nebula",          label: "Nebula",            desc: "Navy header block, light sidebar" },
@@ -161,6 +162,16 @@
       let selectedColorByTemplate = {};
       const bust = Date.now();
 
+      function getTemplateConfig(key) {
+        const c = templateColors[key];
+        if (!c) return null;
+        if (Array.isArray(c)) return { mode: "text", colors: c };
+        return c.mode && c.colors ? c : null;
+      }
+      function getTemplateColors(key) {
+        const cfg = getTemplateConfig(key);
+        return cfg ? cfg.colors : [];
+      }
       async function ensureTemplateColors() {
         if (Object.keys(templateColors).length > 0) return;
         try {
@@ -171,7 +182,7 @@
       fetch("/templates").then(r => r.ok ? r.json() : {}).then(c => {
         templateColors = c || {};
         const h = document.getElementById("server-hint");
-        if (h) h.textContent = Object.keys(templateColors).length ? "Accent colors on — click a template, then pick a color" : "Open at http://localhost:4174 for accent colors";
+        if (h) h.textContent = Object.keys(templateColors).length ? "Click a template, then pick Background or Accent color" : "Using static PDFs. Run npm run preview:serve and open http://localhost:4174 for color picker.";
       }).catch(() => {});
 
       async function renderPdfToCanvas(url, canvas, scale) {
@@ -194,7 +205,7 @@
       }
 
       async function loadThumbnail(t, preview, canvas) {
-        const colors = templateColors[t.key];
+        const colors = getTemplateColors(t.key);
         if (colors && colors.length > 0) {
           try {
             const hex = (colors[0] || "").replace(/^#/, "");
@@ -281,10 +292,13 @@
       }
 
       function paintColorSwatches(t) {
-        const colors = templateColors[t.key];
+        const config = getTemplateConfig(t.key);
+        const colors = config ? config.colors : [];
         const container = document.getElementById("color-swatches");
         const row = document.getElementById("color-row");
+        const labelEl = document.getElementById("color-row-label");
         row.style.display = "flex";
+        if (labelEl) labelEl.textContent = config && config.mode === "background" ? "Background:" : "Accent color:";
         if (!colors || colors.length === 0) {
           container.innerHTML = "<span class=\"server-hint\">Use http://localhost:4174 and run: npm run preview:serve</span>";
           document.getElementById("gen-time").textContent = "";
@@ -315,7 +329,7 @@
         await ensureTemplateColors();
         paintColorSwatches(t);
         document.getElementById("overlay").classList.add("open");
-        const colors = templateColors[t.key];
+        const colors = getTemplateColors(t.key);
         const color = colors && colors.length ? (selectedColorByTemplate[t.key] || colors[0]) : null;
         if (color) {
           await loadPdfInOverlay(t, color);
@@ -349,8 +363,8 @@
       function nav(dir) { openOverlay((currentIdx + dir + TEMPLATES.length) % TEMPLATES.length); }
 
       function copyCmd() {
-        const cmd = "cd functions && npm run build && npm run preview:resumes && npm run preview:invites && npm run preview:serve";
-        navigator.clipboard.writeText(cmd).then(() => alert("Copied! Run in terminal, then open http://localhost:4174")).catch(() => prompt("Copy this:", cmd));
+        const cmd = "cd functions && npm run build && npm run preview:resumes";
+        navigator.clipboard.writeText(cmd).then(() => alert("Copied! Run in terminal from project root, then refresh this page (or open preview/index.html).")).catch(() => prompt("Copy this:", cmd));
       }
 
       document.addEventListener("keydown", e => {

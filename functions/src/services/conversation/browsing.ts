@@ -1,9 +1,10 @@
 import { db } from "utils/firestore";
 import { ParsedMessage } from "services/whatsapp/parseWebhookPayload";
 import { sendList } from "services/whatsapp/sendList";
-import { catalog, findCategory, findProduct } from "config/catalog";
+import { catalog, findCategory, findProduct, LIVE_PRODUCT_ID } from "config/catalog";
 import { Conversation } from "services/conversation/handleIncomingMessage";
-import { initiateFlow } from "services/conversation/discovery";
+import { sendResumeSamplesAndList } from "services/conversation/resumeFilter";
+import { sendText } from "services/whatsapp/sendText";
 import { t } from "utils/t";
 
 export async function browsing(
@@ -21,16 +22,23 @@ export async function browsing(
 
   const id = message.listId;
 
-  // Product selected — go straight to form (refining)
+  // Product selected — only Resume is live; others show "Coming soon"
   const product = findProduct(id);
   if (product?.productConfigId) {
+    if (id !== LIVE_PRODUCT_ID) {
+      await sendText(cid, phone, t("comingSoon"));
+      await sendCurrentLevel(cid, phone, conversation.browsePath ?? []);
+      return;
+    }
     const browsePath = [...(conversation.browsePath ?? [])];
     if (!browsePath.includes(id)) browsePath.push(id);
     await db.collection("conversations").doc(cid).update({
+      useCase: "resume",
       browsePath,
+      status: "selecting_usecases",
       updatedAt: new Date(),
     });
-    await initiateFlow(phone, cid, product.productConfigId, browsePath);
+    await sendResumeSamplesAndList(cid, phone);
     return;
   }
 

@@ -1,5 +1,5 @@
 import {
-  PW, pageBreak, hr, parseResumeData, getPrimaryColor,
+  PW, pageBreak, hr, parseResumeData, getPrimaryColor, renderResumePhoto,
   renderExperience, renderEducation, renderSkillsPills, renderProjects,
 } from "./helpers";
 
@@ -9,12 +9,18 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
   const M = 44;
   const FULL_W = PW - M * 2;
 
-  // ── Header: yellow-green circle + name ──
-  doc.circle(88, 66, 48).fill("#c5e17a");
+  // ── Header: photo left, name/role right (no overlap); photo has theme-colored border ──
+  const PHOTO_CX = 88;
+  const PHOTO_CY = 66;
+  const PHOTO_R = 46;
+  renderResumePhoto(doc, data, PHOTO_CX, PHOTO_CY, PHOTO_R, "#c5e17a", "#d0e88a", 0);
+  doc.circle(PHOTO_CX, PHOTO_CY, PHOTO_R).strokeColor(ACCENT).lineWidth(2).stroke();
+  const NAME_X = PHOTO_CX + PHOTO_R + 12;
+  const NAME_W = FULL_W - (NAME_X - M);
   doc.font("Inter-Bold").fontSize(22).fillColor("#111111")
-    .text(d.fullName, 52, 38, { width: 260 });
+    .text(d.fullName, NAME_X, 38, { width: NAME_W });
   doc.font("Inter").fontSize(10).fillColor("#555555")
-    .text(d.targetRole, 52, doc.y + 3, { width: 260 });
+    .text(d.targetRole, NAME_X, doc.y + 3, { width: NAME_W });
 
   const ROW_START = 128;
 

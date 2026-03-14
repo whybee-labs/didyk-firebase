@@ -1,28 +1,25 @@
 import {
-  PW, pageBreak, parseResumeData, getPrimaryColor,
+  PW, pageBreak, parseResumeData, getPrimaryColor, renderResumePhoto,
   renderExperience, renderEducation, renderSkillsPills, renderProjects,
 } from "./helpers";
 
+const DEFAULT_HEADER_BG = "#fce4ec";
+
 export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): void {
   const d = parseResumeData(data);
-  const PINK = getPrimaryColor(d, "#d4637a");
-  const PINK_LIGHT = "#fce4ec";
-  const DARK = "#2c2c2c";
+  const headerBg = (data.backgroundColor as string) && /^#[0-9A-Fa-f]{6}$/.test(String(data.backgroundColor).trim())
+    ? String(data.backgroundColor).trim() : DEFAULT_HEADER_BG;
+  const textOnHeader = getPrimaryColor(d, "#2c2c2c");
   const M = 44;
   const W = PW - M * 2;
 
-  // ── Blush header area ──
-  doc.rect(0, 0, PW * 0.44, 118).fill(PINK_LIGHT);
+  doc.rect(0, 0, PW * 0.44, 118).fill(headerBg);
 
-  // Photo placeholder
-  doc.circle(M + 36, 38, 34).fill("#e8b0c0");
-  doc.circle(M + 36, 38, 32).fill("#f0c0d0");
-  doc.font("Inter").fontSize(7).fillColor("#fff")
-    .text("PHOTO", M + 20, 34, { width: 32, align: "center" });
+  renderResumePhoto(doc, data, M + 36, 38, 32, "#e8b0c0", "#f0c0d0", -4);
 
-  doc.font("NotoSerif-Bold").fontSize(24).fillColor(DARK)
+  doc.font("NotoSerif-Bold").fontSize(24).fillColor(textOnHeader)
     .text(d.fullName, M, 65, { width: PW * 0.38 });
-  doc.font("Inter").fontSize(9).fillColor("#666")
+  doc.font("Inter").fontSize(9).fillColor(textOnHeader)
     .text(d.targetRole.toUpperCase(), M, doc.y + 3, { width: PW * 0.38, characterSpacing: 0.8 });
 
   // Contact info as rounded pills on the right
@@ -39,12 +36,13 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
 
   const ROW_START = Math.max(doc.y + 12, cY + 6);
 
+  const bodyHeadingColor = "#2c2c2c";
   function heading(title: string): void {
     pageBreak(doc, 40);
-    doc.font("Inter-SemiBold").fontSize(10).fillColor(DARK).text(title, M, doc.y, { width: W });
+    doc.font("Inter-SemiBold").fontSize(10).fillColor(bodyHeadingColor).text(title, M, doc.y, { width: W });
     const lineY = doc.y + 2;
     doc.save().moveTo(M, lineY).lineTo(M + W, lineY)
-      .strokeColor(PINK).lineWidth(1.2).stroke().restore();
+      .strokeColor(headerBg).lineWidth(1.2).stroke().restore();
     doc.y = lineY + 8;
   }
 
@@ -75,7 +73,7 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
 
   if (d.skills?.length) {
     heading("Skills");
-    renderSkillsPills(doc, d.skills, M, doc.y, W, PINK, "#fff");
+    renderSkillsPills(doc, d.skills, M, doc.y, W, headerBg, textOnHeader);
     doc.y += 10;
   }
 

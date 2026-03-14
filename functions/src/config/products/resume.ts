@@ -56,9 +56,10 @@ export const resumeProduct: ProductConfig = {
   description: "A professional resume to land your next internship or job",
   waFlowId: "RESUME_FLOW_ID_PLACEHOLDER",
   openingPrompt:
-    "Let's build your resume! 📄\n\nTell me: your full name, the role you're targeting, a brief professional summary, your education, key skills, and any experience or projects.\n\nYou can also share your email, phone, and location if you want them on the resume. The more you share, the better it'll look!",
+    "Let's build your resume! 📄\n\nI need your *first name*, *last name*, and *target role*. You can also share summary, education, skills, experience, projects, email, phone, LinkedIn, GitHub, website, and location — or skip any of them. You can paste everything at once or send links; I'll understand.",
   fields: [
-    { key: "fullName",    type: "text", required: true,  label: "Full name" },
+    { key: "firstName",   type: "text", required: true,  label: "First name" },
+    { key: "lastName",    type: "text", required: true,  label: "Last name" },
     { key: "targetRole",  type: "text", required: true,  label: "Target role or internship" },
     { key: "summary",     type: "text", required: false, label: "Professional summary (2-3 sentences)" },
     {
@@ -79,11 +80,15 @@ export const resumeProduct: ProductConfig = {
     },
     { key: "email",       type: "text", required: false, label: "Email address" },
     { key: "phone",       type: "text", required: false, label: "Phone number" },
+    { key: "linkedin",    type: "text", required: false, label: "LinkedIn profile URL" },
+    { key: "github",      type: "text", required: false, label: "GitHub profile URL" },
+    { key: "website",     type: "text", required: false, label: "Personal / portfolio website" },
     { key: "address",     type: "text", required: false, label: "Location / address" },
     { key: "primaryColor", type: "text", required: false, label: "Primary color (hex e.g. #1a2744)" },
   ],
   useCases,
   confirmationTemplate: (data) => {
+    const fullName = (data.fullName as string) ?? ([data.firstName, data.lastName].filter(Boolean).join(" ").trim() || "—");
     const exp  = fmtExperience(data.experience);
     const proj = fmtProjects(data.projects);
     const edu  = fmtEducation(data.education);
@@ -91,7 +96,7 @@ export const resumeProduct: ProductConfig = {
     return [
       "📄 *Resume Summary*",
       "",
-      `👤 *Name:* ${data.fullName ?? "—"}`,
+      `👤 *Name:* ${fullName}`,
       `🎯 *Target role:* ${data.targetRole ?? "—"}`,
       ...(data.summary ? [`📝 *Summary:* ${data.summary}`]    : []),
       ...(edu          ? [`🎓 *Education:*\n${edu}`]           : []),
@@ -100,7 +105,10 @@ export const resumeProduct: ProductConfig = {
       ...(proj         ? [`🚀 *Projects:*\n${proj}`]           : []),
       ...(data.email   ? [`📧 *Email:* ${data.email}`]         : []),
       ...(data.phone   ? [`📱 *Phone:* ${data.phone}`]         : []),
-      ...(data.address ? [`📍 *Location:* ${data.address}`]    : []),
+      ...(data.linkedin ? [`🔗 *LinkedIn:* ${data.linkedin}`]  : []),
+      ...(data.github   ? [`🔗 *GitHub:* ${data.github}`]      : []),
+      ...(data.website  ? [`🌐 *Website:* ${data.website}`]    : []),
+      ...(data.address ? [`📍 *Location:* ${data.address}`]   : []),
     ].join("\n");
   },
 };

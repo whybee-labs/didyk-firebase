@@ -14,9 +14,13 @@ import { t } from "utils/t";
 export type ConversationStatus =
   | "discovery"
   | "browsing"
+  | "selecting_filter"
   | "form_sent"
   | "refining"
   | "selecting_usecases"
+  | "selecting_color"
+  | "choose_input_method"
+  | "waiting_for_pdf"
   | "confirming"
   | "generating"
   | "awaiting_payment"
@@ -36,7 +40,10 @@ export interface Conversation {
   useCase?: UseCase;
   collectedData: Record<string, unknown>;
   browsePath?: string[];
+  selectedFilters?: { withPhoto?: "yes" | "no" | "both" };
   selectedUseCaseIds?: string[];
+  selectedPrimaryColor?: string;
+  inputMethod?: "upload" | "scratch";
   paymentData?: {
     linkId: string;
     amount: number;
@@ -71,6 +78,12 @@ export async function handleIncomingMessage(
 ): Promise<void> {
   let { conversation } = await getOrCreateConversation(phone);
 
+  // Voice notes not supported
+  if (message.type === "audio") {
+    await sendText(conversation.conversationId, phone, t("errors.voiceNoteNotAccepted"));
+    return;
+  }
+
   // "hi" resets conversation to discovery from any state (useful for testing)
   if (message.type === "text" && message.text?.toLowerCase().trim() === "hi") {
     await db.collection("conversations").doc(conversation.conversationId).update({
@@ -78,7 +91,10 @@ export async function handleIncomingMessage(
       useCase: FieldValue.delete(),
       collectedData: {},
       browsePath: FieldValue.delete(),
+      selectedFilters: FieldValue.delete(),
       selectedUseCaseIds: FieldValue.delete(),
+      selectedPrimaryColor: FieldValue.delete(),
+      inputMethod: FieldValue.delete(),
       messageHistory: FieldValue.delete(),
       updatedAt: new Date(),
     });
@@ -88,7 +104,10 @@ export async function handleIncomingMessage(
       useCase: undefined,
       collectedData: {},
       browsePath: undefined,
+      selectedFilters: undefined,
       selectedUseCaseIds: undefined,
+      selectedPrimaryColor: undefined,
+      inputMethod: undefined,
       messageHistory: undefined,
     };
   }
@@ -136,6 +155,38 @@ export async function handleIncomingMessage(
       await handleUseCaseSelection(phone, message, conversation);
       break;
 
+    case "selecting_color": {
+      if (message.type === "list_reply" && message.listId) {
+        const { handleColorSelection } = await import("services/conversation/resumeColorSelection");
+        await handleColorSelection(phone, message.listId, conversation);
+      } else {
+        const { sendResumeColorOptions } = await import("services/conversation/resumeColorSelection");
+        await sendResumeColorOptions(phone, conversation);
+      }
+      break;
+    }
+
+    case "choose_input_method": {
+      if (message.type === "button_reply" && message.buttonId) {
+        const { handleInputMethodSelection } = await import("services/conversation/resumeInputMethod");
+        await handleInputMethodSelection(phone, message.buttonId, conversation);
+      } else {
+        const { sendInputMethodPrompt } = await import("services/conversation/resumeInputMethod");
+        await sendInputMethodPrompt(phone, conversation);
+      }
+      break;
+    }
+
+    case "waiting_for_pdf": {
+      if (message.type === "document" && message.mediaId) {
+        const { handleResumePdfUpload } = await import("services/conversation/resumePdfUpload");
+        await handleResumePdfUpload(phone, message.mediaId, conversation);
+      } else {
+        await sendText(conversation.conversationId, phone, t("resume.upload.nudge"));
+      }
+      break;
+    }
+
     case "confirming":
       await handleConfirmation(phone, message, conversation);
       break;
@@ -144,9 +195,24 @@ export async function handleIncomingMessage(
       await sendText(conversation.conversationId, phone, t("status.generating"));
       break;
 
-    case "awaiting_payment":
-      await sendText(conversation.conversationId, phone, t("status.awaitingPayment"));
+    case "awaiting_payment": {
+      const wantsEdit =
+        message.type === "text" &&
+        message.text &&
+        (message.text.length > 25 ||
+          /change|edit|update|modify|wrong|fix|correct|add|remove|replace/i.test(message.text.trim()));
+      if (wantsEdit) {
+        await db.collection("conversations").doc(conversation.conversationId).update({
+          status: "refining",
+          updatedAt: new Date(),
+        });
+        await sendText(conversation.conversationId, phone, t("fulfillment.editFromPreview"));
+        await flowEngine(phone, message, { ...conversation, status: "refining" });
+      } else {
+        await sendText(conversation.conversationId, phone, t("status.awaitingPayment"));
+      }
       break;
+    }
 
     case "awaiting_feedback":
       await handleFeedback(phone, message, conversation);
