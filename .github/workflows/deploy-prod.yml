@@ -26,6 +26,6 @@ jobs:
         run: npm run build --prefix functions
 
       - name: Deploy functions to prod
-        run: npx firebase-tools@latest deploy --only functions --project prod --non-interactive
+        run: npx firebase-tools@latest deploy --only functions --project prod --non-interactive --force
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
