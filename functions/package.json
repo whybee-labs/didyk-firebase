@@ -12,8 +12,11 @@
     "preview:invites": "node lib/scripts/previewInvites.js",
     "preview:serve": "node lib/scripts/servePreview.js",
     "serve": "npm run build && firebase emulators:start --only functions",
-    "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "deploy:staging": "firebase deploy --only functions --project staging",
+    "deploy:prod": "firebase deploy --only functions --project prod",
+    "logs": "firebase functions:log",
+    "logs:staging": "firebase functions:log --project staging",
+    "logs:prod": "firebase functions:log --project prod"
   },
   "dependencies": {
     "@types/pdfkit": "^0.17.5",

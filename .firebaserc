@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "didyk-30aa4"
+    "default": "didyk-30aa4",
+    "prod": "didyk-30aa4",
+    "staging": "dharmawear-f2cc0"
   }
 }
