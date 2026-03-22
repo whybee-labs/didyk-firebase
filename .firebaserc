@@ -2,6 +2,6 @@
   "projects": {
     "default": "didyk-30aa4",
     "prod": "didyk-30aa4",
-    "staging": "dharmawear-f2cc0"
+    "staging": "didyk-staging-421e9"
   }
 }

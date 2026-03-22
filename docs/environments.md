@@ -5,7 +5,7 @@
 | Environment | Firebase Project | Branch | Razorpay | WhatsApp |
 |-------------|-----------------|--------|----------|----------|
 | **prod** | `didyk-30aa4` | `main` | Live mode | Real phone number |
-| **staging** | `dharmawear-f2cc0` | `staging` | Test mode | Same creds as prod (see note) |
+| **staging** | `didyk-staging-421e9` | `staging` | Test mode | Same creds as prod (see note) |
 
 ---
 
@@ -13,7 +13,7 @@
 
 ### 1. Create the staging Firebase project (one-time)
 ```
-firebase projects:create dharmawear-f2cc0 --display-name "Whybee Staging"
+firebase projects:create didyk-staging-421e9 --display-name "Whybee Staging"
 ```
 
 ### 2. Set secrets on staging
@@ -33,7 +33,7 @@ In GitHub repo → Settings → Secrets and variables → Actions:
 
 | Secret | How to get it |
 |--------|--------------|
-| `FIREBASE_SERVICE_ACCOUNT_STAGING` | Firebase Console → `dharmawear-f2cc0` → Project Settings → Service Accounts → Generate new private key |
+| `FIREBASE_SERVICE_ACCOUNT_STAGING` | Firebase Console → `didyk-staging-421e9` → Project Settings → Service Accounts → Generate new private key |
 | `FIREBASE_SERVICE_ACCOUNT_PROD` | Firebase Console → `didyk-30aa4` → Project Settings → Service Accounts → Generate new private key |
 
 ---
@@ -61,4 +61,4 @@ Meta only supports one webhook URL per phone number. Staging shares the same Wha
 - **WhatsApp E2E on staging** (rare): Temporarily update the webhook URL in Meta Dashboard → test → switch back to prod URL
 
 Prod WhatsApp webhook URL: `https://us-central1-didyk-30aa4.cloudfunctions.net/whatsappWebhook`
-Staging WhatsApp webhook URL: `https://us-central1-dharmawear-f2cc0.cloudfunctions.net/whatsappWebhook`
+Staging WhatsApp webhook URL: `https://us-central1-didyk-staging-421e9.cloudfunctions.net/whatsappWebhook`
