@@ -25,10 +25,7 @@ jobs:
       - name: Build
         run: npm run build --prefix functions
 
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}
-
       - name: Deploy functions to prod
         run: npx firebase-tools@latest deploy --only functions --project prod --non-interactive
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
