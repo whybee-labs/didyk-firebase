@@ -8,6 +8,3 @@ export const GROQ_API_KEY = defineSecret("GROQ_API_KEY");
 export const RAZORPAY_KEY_ID = defineSecret("RAZORPAY_KEY_ID");
 export const RAZORPAY_KEY_SECRET = defineSecret("RAZORPAY_KEY_SECRET");
 export const RAZORPAY_WEBHOOK_SECRET = defineSecret("RAZORPAY_WEBHOOK_SECRET");
-export const RAZORPAY_OWNER_OFFER_ID = defineSecret("RAZORPAY_OWNER_OFFER_ID");
-
-export const OWNER_PHONES = defineSecret("OWNER_PHONES");

@@ -26,8 +26,6 @@ firebase functions:secrets:set GROQ_API_KEY
 firebase functions:secrets:set RAZORPAY_KEY_ID             # test mode key
 firebase functions:secrets:set RAZORPAY_KEY_SECRET         # test mode secret
 firebase functions:secrets:set RAZORPAY_WEBHOOK_SECRET     # test mode webhook secret
-firebase functions:secrets:set RAZORPAY_OWNER_OFFER_ID     # test mode offer id
-firebase functions:secrets:set OWNER_PHONES
 ```
 
 ### 3. Add GitHub Actions secrets (for CI/CD)

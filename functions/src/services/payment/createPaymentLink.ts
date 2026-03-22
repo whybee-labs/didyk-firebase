@@ -1,6 +1,5 @@
 import Razorpay from "razorpay";
-import { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_OWNER_OFFER_ID } from "config/env";
-import { isOwner } from "utils/isOwner";
+import { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET } from "config/env";
 
 function getClient(): Razorpay {
   return new Razorpay({
@@ -18,7 +17,6 @@ export async function createPaymentLink(
 ): Promise<{ id: string; shortUrl: string }> {
   const client = getClient();
 
-  const offerId = RAZORPAY_OWNER_OFFER_ID.value();
   const link = await client.paymentLink.create({
     amount: amount * 100, // convert to smallest unit (paise / cents)
     currency,
@@ -27,7 +25,6 @@ export async function createPaymentLink(
     reference_id: `${conversationId}-${Date.now()}`,
     notify: { sms: false, email: false },
     reminder_enable: false,
-    ...(isOwner(phone) && offerId ? { options: { order: { offers: [offerId] } } } : {}),
   });
 
   return { id: link.id, shortUrl: link.short_url };
