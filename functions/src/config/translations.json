@@ -59,11 +59,11 @@
   "fulfillment.previewEditDetails": "✏️ Edit Details",
   "fulfillment.payment": "🎉 Happy with your preview? Your final file — clean, crisp, and watermark-free — will arrive right here on WhatsApp the moment you pay.",
   "fulfillment.editFromPreview": "✏️ Got it — tell me what you'd like to change and I'll update your preview.",
-  "fulfillment.paymentButton": "⚡ Pay {symbol}{amount} instantly",
+  "fulfillment.paymentButton": "✨ Pay {symbol}{amount} instantly",
   "fulfillment.delivering": "🎉 Thank you so much! Your file is on its way — we hope it's everything you imagined. Wishing you all the very best 💫",
 
   "status.generating": "⏳ Still working on it, hang tight!",
-  "status.awaitingPayment": "⚡ Please complete your payment using the link sent above.",
+  "status.awaitingPayment": "✨ Please complete your payment using the link sent above.",
 
   "errors.generic": "😔 Something went wrong. Please try again.",
   "errors.outputFailed": "⚠️ Something went wrong generating your file. Please contact support.",
