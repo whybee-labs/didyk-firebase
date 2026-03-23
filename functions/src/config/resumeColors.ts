@@ -9,6 +9,7 @@ export interface ResumeColorOption {
   id: string;
   label: string;
   hex: string;
+  tag?: "Popular" | "Unique";
 }
 
 export interface ResumeColorConfig {
@@ -16,82 +17,62 @@ export interface ResumeColorConfig {
   colors: ResumeColorOption[];
 }
 
-function opt(id: string, label: string, hex: string): ResumeColorOption {
-  return { id, label, hex };
+function opt(id: string, label: string, hex: string, tag?: "Popular" | "Unique"): ResumeColorOption {
+  const o: ResumeColorOption = { id, label, hex };
+  if (tag) o.tag = tag;
+  return o;
 }
 
-/** Template key (e.g. pulsar, astralis) -> colour config with labels. */
+/** Template key (planet name) -> colour config with labels. */
 export const RESUME_COLOR_CONFIG: Record<string, ResumeColorConfig> = {
-  pulsar: {
+  earth: {
     mode: "background",
     colors: [
-      opt("bg1", "Pale green", "#e8f5e9"),
+      opt("bg1", "Pale green", "#e8f5e9", "Popular"),
       opt("bg2", "Pink", "#ffb3ba"),
       opt("bg3", "Mint", "#b5ead7"),
-      opt("bg4", "Sky blue", "#c7ceea"),
+      opt("bg4", "Sky blue", "#c7ceea", "Unique"),
       opt("bg5", "Cream", "#fff4e6"),
     ],
   },
-  comet: {
+  mars: {
     mode: "background",
     colors: [
-      opt("bg1", "Yellow", "#fdd835"),
-      opt("bg2", "Orange", "#e67e22"),
-      opt("bg3", "Coral", "#ff8a80"),
-      opt("bg4", "Mint", "#b5ead7"),
-      opt("bg5", "Lavender", "#c5cae9"),
+      opt("bg1", "Lavender", "#e8dff0", "Popular"),
+      opt("bg2", "Blush", "#fce4ec"),
+      opt("bg3", "Mint", "#e0f2f1"),
+      opt("bg4", "Sky", "#e3f2fd", "Unique"),
+      opt("bg5", "Cream", "#fff8e1"),
     ],
   },
-  nebula: {
+  saturn: {
     mode: "background",
     colors: [
-      opt("bg1", "Navy", "#1a2744"),
-      opt("bg2", "Dark blue", "#0d2137"),
-      opt("bg3", "Indigo", "#1a237e"),
-      opt("bg4", "Teal", "#004d40"),
-      opt("bg5", "Purple", "#4a148c"),
+      opt("bg1", "Navy", "#1a2744", "Popular"),
+      opt("bg2", "Charcoal", "#2d3436"),
+      opt("bg3", "Forest", "#1b4332"),
+      opt("bg4", "Slate", "#334155"),
+      opt("bg5", "Burgundy", "#4a1942", "Unique"),
     ],
   },
-  celestial: {
-    mode: "background",
-    colors: [
-      opt("bg1", "Navy", "#1a2744"),
-      opt("bg2", "Dark blue", "#0d2137"),
-      opt("bg3", "Indigo", "#1a237e"),
-      opt("bg4", "Teal", "#004d40"),
-      opt("bg5", "Purple", "#4a148c"),
-    ],
-  },
-  aurora: {
+  venus: {
     mode: "background",
     colors: [
       opt("bg1", "Blush", "#fce4ec"),
       opt("bg2", "Pink", "#ffb3ba"),
-      opt("bg3", "Mint", "#b5ead7"),
-      opt("bg4", "Sky", "#c7ceea"),
+      opt("bg3", "Mint", "#b5ead7", "Popular"),
+      opt("bg4", "Sky", "#c7ceea", "Unique"),
       opt("bg5", "Cream", "#fff8e1"),
     ],
   },
-  cosmos: {
-    mode: "background",
-    colors: [
-      opt("bg1", "Charcoal", "#2c2c2c"),
-      opt("bg2", "Navy", "#1a2744"),
-      opt("bg3", "Green", "#1b5e20"),
-      opt("bg4", "Purple", "#4a148c"),
-      opt("bg5", "Blue", "#0d47a1"),
-    ],
-  },
-  astralis: { mode: "text", colors: [opt("t1", "Green", "#2d6a4f"), opt("t2", "Navy", "#1a2744"), opt("t3", "Rose", "#d4637a")] },
-  eclipse: { mode: "text", colors: [opt("t1", "Black", "#1a1a1a"), opt("t2", "Navy", "#1a2744"), opt("t3", "Green", "#2d6a4f")] },
-  galaxy: { mode: "text", colors: [opt("t1", "Navy", "#1a2744"), opt("t2", "Green", "#2d6a4f"), opt("t3", "Purple", "#7b1fa2")] },
-  astral: { mode: "text", colors: [opt("t1", "Navy", "#1a2744"), opt("t2", "Gold", "#c9a96e"), opt("t3", "Green", "#2d6a4f")] },
-  lunar: { mode: "text", colors: [opt("t1", "Navy", "#1a2744"), opt("t2", "Green", "#2d6a4f"), opt("t3", "Purple", "#7b1fa2")] },
-  solstice: { mode: "text", colors: [opt("t1", "Black", "#1a1a1a"), opt("t2", "Navy", "#1a2744"), opt("t3", "Green", "#2d6a4f")] },
-  ats: { mode: "text", colors: [opt("t1", "Navy", "#1a2744"), opt("t2", "Green", "#2d6a4f"), opt("t3", "Red", "#c0392b")] },
+  uranus:  { mode: "text", colors: [opt("t1", "Green", "#2d6a4f", "Unique"), opt("t2", "Navy", "#1a2744"), opt("t3", "Rose", "#d4637a", "Popular")] },
+  pluto:   { mode: "text", colors: [opt("t1", "Black", "#1a1a1a", "Popular"), opt("t2", "Navy", "#1a2744"), opt("t3", "Green", "#2d6a4f", "Unique")] },
+  jupiter: { mode: "text", colors: [opt("t1", "Navy", "#1a2744", "Popular"), opt("t2", "Green", "#2d6a4f"), opt("t3", "Purple", "#7b1fa2", "Unique")] },
+  neptune: { mode: "text", colors: [opt("t1", "Navy", "#1a2744", "Popular"), opt("t2", "Green", "#2d6a4f"), opt("t3", "Purple", "#7b1fa2", "Unique")] },
+  mercury: { mode: "text", colors: [opt("t1", "Navy", "#1a2744", "Popular"), opt("t2", "Green", "#2d6a4f", "Unique"), opt("t3", "Red", "#c0392b")] },
 };
 
-/** Get template key from use case id (e.g. uc-resume-pulsar -> pulsar). */
+/** Get template key from use case id (e.g. uc-resume-earth -> earth). */
 export function templateKeyFromUseCaseId(ucId: string): string {
   return ucId.replace(/^uc-resume-/, "");
 }

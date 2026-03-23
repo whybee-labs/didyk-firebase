@@ -21,8 +21,10 @@ export type ConversationStatus =
   | "selecting_color"
   | "choose_input_method"
   | "waiting_for_pdf"
+  | "reviewing_resume"
   | "confirming"
   | "generating"
+  | "reviewing_preview"
   | "awaiting_payment"
   | "awaiting_feedback"
   | "completed"
@@ -44,6 +46,10 @@ export interface Conversation {
   selectedUseCaseIds?: string[];
   selectedPrimaryColor?: string;
   inputMethod?: "upload" | "scratch";
+  /** Transient flag: when true, flowEngine should not auto-send confirmation even if form is complete. */
+  suppressAutoConfirmation?: boolean;
+  /** Resume: user has reviewed sections and typed "done". Gate for preview generation. */
+  dataConfirmed?: boolean;
   paymentData?: {
     linkId: string;
     amount: number;
@@ -78,14 +84,17 @@ export async function handleIncomingMessage(
 ): Promise<void> {
   let { conversation } = await getOrCreateConversation(phone);
 
-  // Voice notes not supported
+  // Voice notes not supported — send notice, then re-show current step
   if (message.type === "audio") {
     await sendText(conversation.conversationId, phone, t("errors.voiceNoteNotAccepted"));
-    return;
+    // Convert to a no-op text message so the routing below re-sends the current prompt
+    message = { type: "text", text: "" } as ParsedMessage;
   }
 
-  // "hi" resets conversation to discovery from any state (useful for testing)
-  if (message.type === "text" && message.text?.toLowerCase().trim() === "hi") {
+  // "hi" / "reset" / "start over" resets conversation to discovery from any state
+  const txt = message.type === "text" ? message.text?.toLowerCase().trim() : "";
+  const isReset = txt === "hi" || txt === "reset" || txt === "start over" || txt === "restart";
+  if (isReset) {
     await db.collection("conversations").doc(conversation.conversationId).update({
       status: "discovery",
       useCase: FieldValue.delete(),
@@ -95,6 +104,7 @@ export async function handleIncomingMessage(
       selectedUseCaseIds: FieldValue.delete(),
       selectedPrimaryColor: FieldValue.delete(),
       inputMethod: FieldValue.delete(),
+      dataConfirmed: FieldValue.delete(),
       messageHistory: FieldValue.delete(),
       updatedAt: new Date(),
     });
@@ -108,6 +118,7 @@ export async function handleIncomingMessage(
       selectedUseCaseIds: undefined,
       selectedPrimaryColor: undefined,
       inputMethod: undefined,
+      dataConfirmed: undefined,
       messageHistory: undefined,
     };
   }
@@ -187,6 +198,48 @@ export async function handleIncomingMessage(
       break;
     }
 
+    case "reviewing_resume": {
+      if (message.type === "text" && message.text?.toLowerCase().trim() === "done") {
+        const config = getProductConfig(conversation.useCase as UseCase);
+        const missingRequired = config.fields.filter(
+          (f) => f.required && f.type === "text" && !conversation.collectedData[f.key]
+        );
+        if (missingRequired.length > 0) {
+          const msg =
+            missingRequired.length === 1
+              ? t("form.followup.single", { field: missingRequired[0].label })
+              : t("form.followup.many", { fields: missingRequired.map((f) => f.label).join(", ") });
+          await sendText(conversation.conversationId, phone, msg);
+          break;
+        }
+        // Set dataConfirmed and let the flow router decide what's next
+        await db.collection("conversations").doc(conversation.conversationId).update({
+          dataConfirmed: true,
+          updatedAt: new Date(),
+        });
+        const { advanceResumeFlow } = await import("services/conversation/resumeFlowRouter");
+        await advanceResumeFlow(phone, { ...conversation, dataConfirmed: true });
+        break;
+      }
+
+      // Treat anything else as an edit: reuse flowEngine, then re-send all sections.
+      await flowEngine(phone, message, { ...conversation, status: "refining", suppressAutoConfirmation: true });
+
+      const convRef = db.collection("conversations").doc(conversation.conversationId);
+      const convSnap = await convRef.get();
+      if (!convSnap.exists) break;
+      const updated = {
+        conversationId: convSnap.id,
+        ...(convSnap.data() as Omit<Conversation, "conversationId">),
+      } as Conversation;
+
+      await convRef.update({ status: "reviewing_resume", updatedAt: new Date() });
+
+      const { sendResumeSectionsForReview } = await import("services/conversation/resumePdfUpload");
+      await sendResumeSectionsForReview(conversation.conversationId, phone, updated.collectedData);
+      break;
+    }
+
     case "confirming":
       await handleConfirmation(phone, message, conversation);
       break;
@@ -194,6 +247,62 @@ export async function handleIncomingMessage(
     case "generating":
       await sendText(conversation.conversationId, phone, t("status.generating"));
       break;
+
+    case "reviewing_preview": {
+      if (message.type === "button_reply" && message.buttonId) {
+        if (message.buttonId === "generate_final") {
+          // Create payment link and send
+          const config = getProductConfig(conversation.useCase as UseCase);
+          const currency = phone.startsWith("91") ? "INR" : "USD";
+          const symbol = currency === "INR" ? "₹" : "$";
+          const { findUseCase } = await import("config/catalog");
+          const selectedUc = findUseCase(conversation.selectedUseCaseIds?.[0] ?? "");
+          const amount = selectedUc?.pricing[currency] ?? 0;
+          const { createPaymentLink } = await import("services/payment/createPaymentLink");
+          const { id, shortUrl } = await createPaymentLink(phone, conversation.conversationId, amount, `Whybee ${config.name}`, currency);
+          const { sendCTAButton } = await import("services/whatsapp/sendCTAButton");
+          await sendCTAButton(conversation.conversationId, phone, t("fulfillment.payment"), t("fulfillment.paymentButton", { symbol, amount: String(amount) }), shortUrl);
+          await db.collection("conversations").doc(conversation.conversationId).update({
+            status: "awaiting_payment",
+            paymentData: { linkId: id, amount, currency, createdAt: new Date() },
+            updatedAt: new Date(),
+          });
+        } else if (message.buttonId === "change_template") {
+          // Clear template + color, let router find the next unfilled step
+          await db.collection("conversations").doc(conversation.conversationId).update({
+            selectedUseCaseIds: FieldValue.delete(),
+            selectedPrimaryColor: FieldValue.delete(),
+            updatedAt: new Date(),
+          });
+          const { advanceResumeFlow } = await import("services/conversation/resumeFlowRouter");
+          await advanceResumeFlow(phone, { ...conversation, selectedUseCaseIds: undefined, selectedPrimaryColor: undefined });
+        } else if (message.buttonId === "edit_details") {
+          // Clear dataConfirmed so user must type "done" again after editing
+          await db.collection("conversations").doc(conversation.conversationId).update({
+            dataConfirmed: false,
+            updatedAt: new Date(),
+          });
+          const { advanceResumeFlow } = await import("services/conversation/resumeFlowRouter");
+          await advanceResumeFlow(phone, { ...conversation, dataConfirmed: false });
+        }
+      } else {
+        // Text message — treat as edit intent
+        await db.collection("conversations").doc(conversation.conversationId).update({
+          dataConfirmed: false,
+          updatedAt: new Date(),
+        });
+        await flowEngine(phone, message, { ...conversation, status: "refining", suppressAutoConfirmation: true });
+        const convRef3 = db.collection("conversations").doc(conversation.conversationId);
+        const convSnap3 = await convRef3.get();
+        if (convSnap3.exists) {
+          const updated3 = { conversationId: convSnap3.id, ...(convSnap3.data() as Omit<Conversation, "conversationId">) } as Conversation;
+          await convRef3.update({ status: "reviewing_resume", updatedAt: new Date() });
+          const { sendResumeSectionsForReview } = await import("services/conversation/resumePdfUpload");
+          await sendResumeSectionsForReview(conversation.conversationId, phone, updated3.collectedData);
+        }
+      }
+      break;
+    }
 
     case "awaiting_payment": {
       const wantsEdit =

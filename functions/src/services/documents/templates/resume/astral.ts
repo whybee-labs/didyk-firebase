@@ -1,6 +1,7 @@
 import {
-  PW, pageBreak, hr, parseResumeData, getPrimaryColor, renderResumePhoto,
+  PW, pageBreak, hr, parseResumeData, getPrimaryColor, renderContactItem,
   renderExperience, renderEducation, renderSkillsList, renderProjects,
+  renderOptionalSections,
 } from "./helpers";
 
 export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): void {
@@ -10,19 +11,16 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
   const M = 44;
   const W = PW - M * 2;
 
-  // ── Header: photo circle + name ──
-  renderResumePhoto(doc, data, M + 40, 56, 34, "#e0e0e0", "#f0f0f0", -4);
-
-  const nameX = M + 90;
+  // ── Header: name + contacts ──
   doc.font("NotoSerif-Bold").fontSize(22).fillColor(NAVY)
-    .text(d.fullName, nameX, 26, { width: PW - nameX - M });
+    .text(d.fullName, M, 26, { width: W });
   doc.font("Inter").fontSize(9.5).fillColor("#555")
-    .text(d.targetRole, nameX, doc.y + 3, { width: PW - nameX - M });
+    .text(d.targetRole, M, doc.y + 3, { width: W });
 
   let cY = doc.y + 5;
-  const contacts = [d.email, d.phone, d.address, d.linkedin, d.website].filter(Boolean) as string[];
+  const contacts = [d.email, d.phone, d.linkedin, d.github, d.website, d.address].filter(Boolean) as string[];
   for (const c of contacts) {
-    doc.font("Inter").fontSize(8).fillColor("#777").text(c, nameX, cY, { width: PW - nameX - M });
+    renderContactItem(doc, c, M, cY, W, "Inter", 8, "#777");
     cY = doc.y + 2;
   }
 
@@ -77,5 +75,12 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
     renderProjects(doc, d.projects, M, W,
       { title: "Inter-SemiBold", body: "Inter", bullet: "Inter" },
       { title: "#111", body: "#444", bullet: "#444" });
+    doc.y += 8;
   }
+
+  renderOptionalSections(doc, d, M, W,
+    (title) => { pageBreak(doc, 40); doc.font("NotoSerif-Bold").fontSize(10).fillColor(NAVY).text(title, M, doc.y, { width: W }); hr(doc, M, doc.y + 2, W, GOLD, 0.8); doc.y += 8; },
+    { title: "Inter-SemiBold", body: "Inter", meta: "Inter-Italic", bullet: "Inter" },
+    { title: "#111", body: "#333", meta: "#666", bullet: "#444" },
+    NAVY);
 }

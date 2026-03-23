@@ -1,6 +1,7 @@
 import {
-  PW, PH, pageBreak, hr, parseResumeData, getPrimaryColor, renderResumePhoto,
+  PW, PH, pageBreak, hr, parseResumeData, getPrimaryColor, autoFitText,
   renderExperience, renderSkillsList, renderProjects,
+  renderOptionalSections, renderContactItem,
 } from "./helpers";
 
 const DEFAULT_SIDEBAR_HEADER = "#1a2744";
@@ -17,24 +18,22 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
   const MAIN_X = SIDEBAR_W + 22;
   const MAIN_W = PW - MAIN_X - 38;
 
-  const contacts = [d.email, d.phone, d.address, d.linkedin].filter(Boolean) as string[];
-  const NAVY_H = 126 + contacts.length * 14 + 10;
+  const contacts = [d.email, d.phone, d.linkedin, d.github, d.website, d.address].filter(Boolean) as string[];
+  const NAVY_H = 80 + contacts.length * 14 + 10;
 
   doc.rect(0, 0, SIDEBAR_W, PH).fill(SIDEBAR_BG);
   doc.rect(0, 0, SIDEBAR_W, NAVY_H).fill(sidebarHeaderBg);
   doc.on("pageAdded", () => { doc.rect(0, 0, SIDEBAR_W, PH).fill(SIDEBAR_BG); });
 
-  const photoX = SIDEBAR_W / 2;
-  renderResumePhoto(doc, data, photoX, 48, 28, "#2a3d5c", "#3a4d6c", -4);
-
-  doc.font("Inter-Bold").fontSize(16).fillColor(textOnSidebar)
-    .text(d.fullName, SX, 84, { width: SW });
+  const nameSize = autoFitText(doc, d.fullName, "Inter-Bold", 16, 10, SW);
+  doc.font("Inter-Bold").fontSize(nameSize).fillColor(textOnSidebar)
+    .text(d.fullName, SX, 22, { width: SW });
   doc.font("Inter").fontSize(9).fillColor(textOnSidebar)
     .text(d.targetRole, SX, doc.y + 3, { width: SW });
 
   let sY = doc.y + 10;
   for (const c of contacts) {
-    doc.font("Inter").fontSize(7.5).fillColor(textOnSidebar).text(c, SX, sY, { width: SW });
+    renderContactItem(doc, c, SX, sY, SW, "Inter", 7.5, textOnSidebar);
     sY = doc.y + 3;
   }
 
@@ -68,6 +67,46 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
     sY = doc.y + 7;
     doc.y = sY;
     renderSkillsList(doc, d.skills, SX, SW, "Inter", "#333");
+    sY = doc.y + 12;
+  }
+
+  if (d.languages?.length) {
+    doc.font("Inter-SemiBold").fontSize(7.5).fillColor(sidebarHeaderBg)
+      .text("LANGUAGES", SX, sY, { width: SW, characterSpacing: 1.2 });
+    hr(doc, SX, doc.y + 2, SW, "#ccc", 0.4);
+    sY = doc.y + 7;
+    for (const lang of d.languages) {
+      const label = lang.proficiency ? `${lang.language} — ${lang.proficiency}` : lang.language;
+      doc.font("Inter").fontSize(7.5).fillColor("#333")
+        .text(`•   ${label}`, SX, sY, { width: SW });
+      sY = doc.y + 3;
+    }
+    sY += 8;
+  }
+
+  if (d.interests?.length) {
+    doc.font("Inter-SemiBold").fontSize(7.5).fillColor(sidebarHeaderBg)
+      .text("INTERESTS", SX, sY, { width: SW, characterSpacing: 1.2 });
+    hr(doc, SX, doc.y + 2, SW, "#ccc", 0.4);
+    sY = doc.y + 7;
+    for (const item of d.interests) {
+      doc.font("Inter").fontSize(7.5).fillColor("#333")
+        .text(`•   ${item}`, SX, sY, { width: SW });
+      sY = doc.y + 3;
+    }
+    sY += 8;
+  }
+
+  if (d.causes?.length) {
+    doc.font("Inter-SemiBold").fontSize(7.5).fillColor(sidebarHeaderBg)
+      .text("CAUSES", SX, sY, { width: SW, characterSpacing: 1.2 });
+    hr(doc, SX, doc.y + 2, SW, "#ccc", 0.4);
+    sY = doc.y + 7;
+    for (const item of d.causes) {
+      doc.font("Inter").fontSize(7.5).fillColor("#333")
+        .text(`•   ${item}`, SX, sY, { width: SW });
+      sY = doc.y + 3;
+    }
   }
 
   // ── Main column flows independently ──
@@ -106,5 +145,13 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
     renderProjects(doc, d.projects, MAIN_X, MAIN_W,
       { title: "Inter-SemiBold", body: "Inter", bullet: "Inter" },
       { title: "#111", body: "#444", bullet: "#444" });
+    doc.y += 8;
   }
+
+  renderOptionalSections(doc, d, MAIN_X, MAIN_W,
+    (title) => { pageBreak(doc, 40); doc.font("Inter-SemiBold").fontSize(10).fillColor(sidebarHeaderBg).text(title.toUpperCase(), MAIN_X, doc.y, { width: MAIN_W, characterSpacing: 1 }); hr(doc, MAIN_X, doc.y + 3, MAIN_W, sidebarHeaderBg, 0.6); doc.y += 9; },
+    { title: "Inter-SemiBold", body: "Inter", meta: "Inter-Italic", bullet: "Inter" },
+    { title: "#111", body: "#333", meta: "#666", bullet: "#444" },
+    sidebarHeaderBg, "#ffffff",
+    ["languages", "interests", "causes"]);
 }

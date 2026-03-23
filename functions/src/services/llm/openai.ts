@@ -1,13 +1,17 @@
 import OpenAI from "openai";
-import { GROQ_API_KEY } from "config/env";
+import { OPENAI_API_KEY } from "config/env";
 
-const MODEL = "llama-3.1-8b-instant";
+const MODEL = "gpt-4o-mini";
+
+let client: OpenAI | null = null;
 
 function getClient(): OpenAI {
-  return new OpenAI({
-    apiKey: GROQ_API_KEY.value(),
-    baseURL: "https://api.groq.com/openai/v1",
-  });
+  if (!client) {
+    client = new OpenAI({
+      apiKey: OPENAI_API_KEY.value(),
+    });
+  }
+  return client;
 }
 
 export async function callOpenAI(
@@ -16,16 +20,21 @@ export async function callOpenAI(
   jsonMode = true,
   history?: Array<{ role: "user" | "assistant"; content: string }>
 ): Promise<string> {
-  const client = getClient();
+  const openai = getClient();
 
-  const response = await client.chat.completions.create({
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    { role: "system", content: systemPrompt },
+    ...(history ?? []).map((h) => ({
+      role: h.role as "user" | "assistant",
+      content: h.content,
+    })),
+    { role: "user", content: userMessage },
+  ];
+
+  const response = await openai.chat.completions.create({
     model: MODEL,
     ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
-    messages: [
-      { role: "system", content: systemPrompt },
-      ...(history ?? []),
-      { role: "user", content: userMessage },
-    ],
+    messages,
     temperature: 0.2,
   });
 

@@ -32,6 +32,53 @@ export interface ResumeProject {
   url?: string;
 }
 
+export interface ResumeVolunteer {
+  role: string;
+  organization: string;
+  startDate?: string;
+  endDate?: string;
+  bullets?: string[];
+}
+
+export interface ResumeCertification {
+  name: string;
+  issuer?: string;
+  date?: string;
+  url?: string;
+}
+
+export interface ResumeAward {
+  title: string;
+  issuer?: string;
+  date?: string;
+  description?: string;
+}
+
+export interface ResumeLanguage {
+  language: string;
+  proficiency?: string;
+}
+
+export interface ResumeOrganization {
+  name: string;
+  role?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface ResumeAchievement {
+  title: string;
+  description?: string;
+  url?: string;
+}
+
+export interface ResumeConference {
+  name: string;
+  role?: string;
+  date?: string;
+  url?: string;
+}
+
 export interface ResumeData {
   fullName: string;
   targetRole: string;
@@ -40,10 +87,20 @@ export interface ResumeData {
   education?: ResumeEducation[];
   skills?: string[];
   projects?: ResumeProject[];
+  volunteer?: ResumeVolunteer[];
+  certifications?: ResumeCertification[];
+  awards?: ResumeAward[];
+  languages?: ResumeLanguage[];
+  interests?: string[];
+  organizations?: ResumeOrganization[];
+  achievements?: ResumeAchievement[];
+  conferences?: ResumeConference[];
+  causes?: string[];
   email?: string;
   phone?: string;
   address?: string;
   linkedin?: string;
+  github?: string;
   website?: string;
   /** Optional primary accent color (hex e.g. #1a2744). Used for headings, rules, accents. */
   primaryColor?: string;
@@ -60,20 +117,38 @@ export function getPrimaryColor(d: ResumeData, defaultHex: string): string {
 
 export function parseResumeData(raw: Record<string, unknown>): ResumeData {
   return {
-    fullName:   String(raw.fullName ?? ""),
-    targetRole: String(raw.targetRole ?? ""),
-    summary:    raw.summary ? String(raw.summary) : undefined,
-    experience: parseExperience(raw.experience),
-    education:  parseEducation(raw.education),
-    skills:     parseSkills(raw.skills),
-    projects:   parseProjects(raw.projects),
-    email:      raw.email ? String(raw.email) : undefined,
-    phone:      raw.phone ? String(raw.phone) : undefined,
-    address:    raw.address ? String(raw.address) : undefined,
-    linkedin:   raw.linkedin ? String(raw.linkedin) : undefined,
-    website:    raw.website ? String(raw.website) : undefined,
-    primaryColor: raw.primaryColor ? String(raw.primaryColor) : undefined,
+    fullName:       String(raw.fullName ?? ""),
+    targetRole:     String(raw.targetRole ?? ""),
+    summary:        raw.summary ? String(raw.summary) : undefined,
+    experience:     parseExperience(raw.experience),
+    education:      parseEducation(raw.education),
+    skills:         parseSkills(raw.skills),
+    projects:       parseProjects(raw.projects),
+    volunteer:      parseObjectArray<ResumeVolunteer>(raw.volunteer),
+    certifications: parseObjectArray<ResumeCertification>(raw.certifications),
+    awards:         parseObjectArray<ResumeAward>(raw.awards),
+    languages:      parseObjectArray<ResumeLanguage>(raw.languages),
+    interests:      parseSkills(raw.interests),
+    organizations:  parseObjectArray<ResumeOrganization>(raw.organizations),
+    achievements:   parseObjectArray<ResumeAchievement>(raw.achievements),
+    conferences:    parseObjectArray<ResumeConference>(raw.conferences),
+    causes:         parseSkills(raw.causes),
+    email:          raw.email ? String(raw.email) : undefined,
+    phone:          raw.phone ? String(raw.phone) : undefined,
+    address:        raw.address ? String(raw.address) : undefined,
+    linkedin:       raw.linkedin ? String(raw.linkedin) : undefined,
+    github:         raw.github ? String(raw.github) : undefined,
+    website:        raw.website ? String(raw.website) : undefined,
+    primaryColor:   raw.primaryColor ? String(raw.primaryColor) : undefined,
   };
+}
+
+/** Generic parser for arrays of objects (certifications, awards, etc.) */
+function parseObjectArray<T>(val: unknown): T[] | undefined {
+  if (!val) return undefined;
+  if (Array.isArray(val) && val.length > 0) return val as T[];
+  if (!Array.isArray(val) && typeof val === "object") return [val as T];
+  return undefined;
 }
 
 function parseExperience(val: unknown): ResumeJob[] | undefined {
@@ -130,6 +205,24 @@ function parseProjects(val: unknown): ResumeProject[] | undefined {
   });
 }
 
+// ── Auto-fit text helper ─────────────────────────────────────────────────────
+
+/** Shrink font size until text fits within maxWidth. Returns the chosen size. */
+export function autoFitText(
+  doc: PDFKit.PDFDocument,
+  text: string, font: string,
+  maxSize: number, minSize: number,
+  maxWidth: number,
+  characterSpacing = 0,
+): number {
+  for (let size = maxSize; size >= minSize; size -= 0.5) {
+    doc.font(font).fontSize(size);
+    const w = doc.widthOfString(text) + characterSpacing * Math.max(0, text.length - 1);
+    if (w <= maxWidth) return size;
+  }
+  return minSize;
+}
+
 // ── Low-level drawing helpers ────────────────────────────────────────────────
 
 export const PAGE_TOP = 40;
@@ -152,51 +245,99 @@ export function hr(
     .restore();
 }
 
-/**
- * Draw the resume photo circle: user's photo if data._photoBuffer is set, else placeholder.
- * Used by photo-capable templates (Astral, Aurora, Nebula, Celestial, Astralis, Comet).
- */
-export function renderResumePhoto(
+/** Convert a contact value to a clickable URL for PDFKit `link:` option. */
+export function contactUrl(value: string): string | undefined {
+  const v = value.trim();
+  if (v.includes("@") && !v.startsWith("http")) return `mailto:${v}`;
+  if (v.match(/^[\d\s()+-]+$/)) return `tel:${v.replace(/\s/g, "")}`;
+  if (v.startsWith("http://") || v.startsWith("https://")) return v;
+  if (v.includes(".")) return `https://${v}`;
+  return undefined;
+}
+
+/** Render contacts as centered inline lines with separator, each item clickable. Max 3 per line. */
+export function renderContactsInline(
   doc: PDFKit.PDFDocument,
-  data: Record<string, unknown>,
-  cx: number,
-  cy: number,
-  radius: number,
-  placeholderOuter = "#e0e0e0",
-  placeholderInner = "#f0f0f0",
-  labelYOffset = 0,
+  contacts: string[],
+  x: number, y: number, w: number,
+  font: string, fontSize: number, color: string,
+  separator = "   |   ",
+  maxPerLine = 3,
 ): void {
-  const buf = data._photoBuffer as Buffer | undefined;
-  if (buf && Buffer.isBuffer(buf)) {
-    doc.save();
-    doc.circle(cx, cy, radius).clip();
-    doc.image(buf, cx - radius, cy - radius, { width: radius * 2, height: radius * 2 });
-    doc.restore();
-    return;
+  if (!contacts.length) return;
+  const lineH = fontSize + 6;
+  let ly = y;
+  for (let start = 0; start < contacts.length; start += maxPerLine) {
+    const chunk = contacts.slice(start, start + maxPerLine);
+    const sepW = doc.font(font).fontSize(fontSize).widthOfString(separator);
+    const itemWidths = chunk.map(c => doc.font(font).fontSize(fontSize).widthOfString(c));
+    const totalW = itemWidths.reduce((a, b) => a + b, 0) + sepW * (chunk.length - 1);
+    let cx = x + (w - totalW) / 2;
+    for (let i = 0; i < chunk.length; i++) {
+      const link = contactUrl(chunk[i]);
+      const opts: Record<string, unknown> = { width: itemWidths[i] + 1, lineBreak: false };
+      if (link) { opts.link = link; opts.underline = true; }
+      doc.font(font).fontSize(fontSize).fillColor(color)
+        .text(chunk[i], cx, ly, opts);
+      cx += itemWidths[i];
+      if (i < chunk.length - 1) {
+        doc.font(font).fontSize(fontSize).fillColor(color)
+          .text(separator, cx, ly, { width: sepW + 1, lineBreak: false });
+        cx += sepW;
+      }
+    }
+    ly += lineH;
   }
-  doc.circle(cx, cy, radius + 2).fill(placeholderOuter);
-  doc.circle(cx, cy, radius).fill(placeholderInner);
-  doc.font("Inter").fontSize(7).fillColor("#999")
-    .text("PHOTO", cx - radius, cy - 6 + labelYOffset, { width: radius * 2, align: "center" });
+  doc.y = ly;
+}
+
+/** Render a single contact item with clickable link (for vertical lists). */
+export function renderContactItem(
+  doc: PDFKit.PDFDocument,
+  value: string,
+  x: number, y: number, w: number,
+  font: string, fontSize: number, color: string,
+): void {
+  const link = contactUrl(value);
+  const opts: Record<string, unknown> = { width: w };
+  if (link) { opts.link = link; opts.underline = true; }
+  doc.font(font).fontSize(fontSize).fillColor(color)
+    .text(value, x, y, opts);
 }
 
 // ── Shared section renderers (used by polished batch-1 templates) ────────────
 
-export function renderExperience(
-  doc: PDFKit.PDFDocument,
-  jobs: ResumeJob[],
-  x: number, w: number,
+/** Group jobs by company name for rendering. Preserves array order. */
+function groupJobsByCompany(jobs: ResumeJob[]): Array<{ company: string; location?: string; roles: ResumeJob[] }> {
+  const groups: Map<string, { company: string; location?: string; roles: ResumeJob[] }> = new Map();
+  const order: string[] = [];
+
+  for (const job of jobs) {
+    const key = (job.company || "").trim().toLowerCase();
+    if (!groups.has(key)) {
+      groups.set(key, { company: job.company, location: job.location, roles: [] });
+      order.push(key);
+    }
+    groups.get(key)!.roles.push(job);
+  }
+
+  return order.map((k) => groups.get(k)!);
+}
+
+function renderSingleRole(
+  doc: PDFKit.PDFDocument, job: ResumeJob,
+  x: number, w: number, indent: number,
   fonts: { title: string; body: string; meta: string; bullet: string },
   colors: { title: string; meta: string; body: string; bullet: string },
+  showCompany: boolean,
 ): void {
-  for (let i = 0; i < jobs.length; i++) {
-    const job = jobs[i];
-    pageBreak(doc, 50);
+  pageBreak(doc, 50);
 
-    // Job title + company
-    doc.font(fonts.title).fontSize(10).fillColor(colors.title)
-      .text(job.title, x, doc.y, { width: w, continued: false });
+  // Title
+  doc.font(fonts.title).fontSize(10).fillColor(colors.title)
+    .text(job.title, x + indent, doc.y, { width: w - indent, continued: false });
 
+  if (showCompany) {
     const companyLine = [job.company, job.location].filter(Boolean).join(", ");
     const dateLine = [job.startDate, job.endDate].filter(Boolean).join(" – ");
 
@@ -211,25 +352,65 @@ export function renderExperience(
     } else {
       doc.text(companyLine, x, doc.y + 1, { width: w });
     }
+  } else {
+    // Sub-role under grouped company — show dates only
+    const dateLine = [job.startDate, job.endDate].filter(Boolean).join(" – ");
+    if (dateLine) {
+      doc.font(fonts.meta).fontSize(8.5).fillColor(colors.meta)
+        .text(dateLine, x + indent, doc.y + 1, { width: w - indent });
+    }
+  }
 
+  doc.y += 3;
+
+  // Bullets
+  const bulletIndent = x + indent + 8;
+  const bulletW = w - indent - 16;
+  for (const b of job.bullets) {
+    pageBreak(doc, 14);
+    doc.font(fonts.bullet).fontSize(8.5).fillColor(colors.bullet)
+      .text(`•   ${b}`, bulletIndent, doc.y, { width: bulletW, lineGap: 1.5 });
+    doc.y += 2;
+  }
+
+  if (job.url) {
+    pageBreak(doc, 14);
+    doc.font(fonts.meta).fontSize(7.5).fillColor("#2563eb")
+      .text(job.url, bulletIndent, doc.y + 1, { width: bulletW, link: job.url, underline: true });
     doc.y += 3;
+  }
+}
 
-    // Bullets
-    for (const b of job.bullets) {
-      pageBreak(doc, 14);
-      doc.font(fonts.bullet).fontSize(8.5).fillColor(colors.bullet)
-        .text(`•   ${b}`, x + 8, doc.y, { width: w - 16, lineGap: 1.5 });
-      doc.y += 2;
+export function renderExperience(
+  doc: PDFKit.PDFDocument,
+  jobs: ResumeJob[],
+  x: number, w: number,
+  fonts: { title: string; body: string; meta: string; bullet: string },
+  colors: { title: string; meta: string; body: string; bullet: string },
+): void {
+  const groups = groupJobsByCompany(jobs);
+
+  for (let gi = 0; gi < groups.length; gi++) {
+    const group = groups[gi];
+
+    if (group.roles.length === 1) {
+      // Single role at company — render normally
+      renderSingleRole(doc, group.roles[0], x, w, 0, fonts, colors, true);
+    } else {
+      // Multiple roles — company header + indented sub-roles
+      pageBreak(doc, 50);
+      const loc = group.location ? `, ${group.location}` : "";
+      doc.font(fonts.title).fontSize(10).fillColor(colors.title)
+        .text(`${group.company}${loc}`, x, doc.y, { width: w });
+      doc.y += 4;
+
+      for (let ri = 0; ri < group.roles.length; ri++) {
+        renderSingleRole(doc, group.roles[ri], x, w, 10, fonts, colors, false);
+        if (ri < group.roles.length - 1) doc.y += 6;
+      }
     }
 
-    if (job.url) {
-      pageBreak(doc, 14);
-      doc.font(fonts.meta).fontSize(7.5).fillColor("#2563eb")
-        .text(job.url, x + 8, doc.y + 1, { width: w - 16, link: job.url, underline: true });
-      doc.y += 3;
-    }
-
-    if (i < jobs.length - 1) doc.y += 10;
+    if (gi < groups.length - 1) doc.y += 10;
   }
 }
 
@@ -372,6 +553,273 @@ export function renderProjects(
     }
 
     if (i < projects.length - 1) doc.y += 8;
+  }
+}
+
+// ── Render functions for additional sections ────────────────────────────────
+
+export function renderVolunteer(
+  doc: PDFKit.PDFDocument,
+  entries: ResumeVolunteer[],
+  x: number, w: number,
+  fonts: { title: string; meta: string; bullet: string },
+  colors: { title: string; meta: string; bullet: string },
+): void {
+  for (let i = 0; i < entries.length; i++) {
+    const v = entries[i];
+    pageBreak(doc, 36);
+
+    doc.font(fonts.title).fontSize(9.5).fillColor(colors.title)
+      .text(v.role, x, doc.y, { width: w });
+
+    const orgLine = v.organization;
+    const dateLine = [v.startDate, v.endDate].filter(Boolean).join(" – ");
+    doc.font(fonts.meta).fontSize(8.5).fillColor(colors.meta);
+    if (dateLine) {
+      const dateW = doc.widthOfString(dateLine);
+      const metaY = doc.y + 1;
+      doc.text(orgLine, x, metaY, { width: w - dateW - 10 });
+      doc.text(dateLine, x + w - dateW, metaY, { width: dateW, align: "right" });
+      doc.y = metaY + 12;
+    } else {
+      doc.text(orgLine, x, doc.y + 1, { width: w });
+    }
+    doc.y += 3;
+
+    if (v.bullets) {
+      for (const b of v.bullets) {
+        pageBreak(doc, 14);
+        doc.font(fonts.bullet).fontSize(8.5).fillColor(colors.bullet)
+          .text(`•   ${b}`, x + 8, doc.y, { width: w - 16, lineGap: 1.5 });
+        doc.y += 2;
+      }
+    }
+    if (i < entries.length - 1) doc.y += 8;
+  }
+}
+
+export function renderCertifications(
+  doc: PDFKit.PDFDocument,
+  entries: ResumeCertification[],
+  x: number, w: number,
+  fonts: { title: string; meta: string },
+  colors: { title: string; meta: string },
+): void {
+  for (let i = 0; i < entries.length; i++) {
+    const c = entries[i];
+    pageBreak(doc, 24);
+
+    doc.font(fonts.title).fontSize(9.5).fillColor(colors.title)
+      .text(c.name, x, doc.y, { width: w });
+
+    const metaLine = [c.issuer, c.date].filter(Boolean).join(" — ");
+    if (metaLine) {
+      doc.font(fonts.meta).fontSize(8.5).fillColor(colors.meta)
+        .text(metaLine, x, doc.y + 1, { width: w });
+    }
+
+    if (c.url) {
+      pageBreak(doc, 14);
+      doc.font(fonts.meta).fontSize(7.5).fillColor("#2563eb")
+        .text(c.url, x + 8, doc.y + 1, { width: w - 16, link: c.url, underline: true });
+      doc.y += 3;
+    }
+    if (i < entries.length - 1) doc.y += 6;
+  }
+}
+
+export function renderAwards(
+  doc: PDFKit.PDFDocument,
+  entries: ResumeAward[],
+  x: number, w: number,
+  fonts: { title: string; meta: string; body: string },
+  colors: { title: string; meta: string; body: string },
+): void {
+  for (let i = 0; i < entries.length; i++) {
+    const a = entries[i];
+    pageBreak(doc, 24);
+
+    doc.font(fonts.title).fontSize(9.5).fillColor(colors.title)
+      .text(a.title, x, doc.y, { width: w });
+
+    const metaLine = [a.issuer, a.date].filter(Boolean).join(" — ");
+    if (metaLine) {
+      doc.font(fonts.meta).fontSize(8.5).fillColor(colors.meta)
+        .text(metaLine, x, doc.y + 1, { width: w });
+    }
+
+    if (a.description) {
+      doc.font(fonts.body).fontSize(8.5).fillColor(colors.body)
+        .text(a.description, x, doc.y + 2, { width: w, lineGap: 1.2 });
+    }
+    if (i < entries.length - 1) doc.y += 6;
+  }
+}
+
+export function renderLanguages(
+  doc: PDFKit.PDFDocument,
+  entries: ResumeLanguage[],
+  x: number, w: number,
+  fonts: { title: string; meta: string },
+  colors: { title: string; meta: string },
+): void {
+  const colW = w / 2 - 10;
+  const startY = doc.y;
+  const half = Math.ceil(entries.length / 2);
+
+  for (let i = 0; i < half; i++) {
+    const e = entries[i];
+    const label = e.proficiency ? `${e.language} — ${e.proficiency}` : e.language;
+    doc.font(fonts.title).fontSize(8.5).fillColor(colors.title)
+      .text(`•   ${label}`, x, startY + i * 15, { width: colW });
+  }
+  for (let i = half; i < entries.length; i++) {
+    const e = entries[i];
+    const label = e.proficiency ? `${e.language} — ${e.proficiency}` : e.language;
+    doc.font(fonts.title).fontSize(8.5).fillColor(colors.title)
+      .text(`•   ${label}`, x + colW + 20, startY + (i - half) * 15, { width: colW });
+  }
+  doc.y = startY + half * 15;
+}
+
+export function renderOrganizations(
+  doc: PDFKit.PDFDocument,
+  entries: ResumeOrganization[],
+  x: number, w: number,
+  fonts: { title: string; meta: string },
+  colors: { title: string; meta: string },
+): void {
+  for (let i = 0; i < entries.length; i++) {
+    const o = entries[i];
+    pageBreak(doc, 24);
+
+    const titleLine = o.role ? `${o.role} — ${o.name}` : o.name;
+    doc.font(fonts.title).fontSize(9.5).fillColor(colors.title)
+      .text(titleLine, x, doc.y, { width: w });
+
+    const dateLine = [o.startDate, o.endDate].filter(Boolean).join(" – ");
+    if (dateLine) {
+      doc.font(fonts.meta).fontSize(8.5).fillColor(colors.meta)
+        .text(dateLine, x, doc.y + 1, { width: w });
+    }
+    if (i < entries.length - 1) doc.y += 6;
+  }
+}
+
+export function renderAchievements(
+  doc: PDFKit.PDFDocument,
+  entries: ResumeAchievement[],
+  x: number, w: number,
+  fonts: { title: string; body: string },
+  colors: { title: string; body: string },
+): void {
+  for (let i = 0; i < entries.length; i++) {
+    const a = entries[i];
+    pageBreak(doc, 24);
+
+    doc.font(fonts.title).fontSize(9.5).fillColor(colors.title)
+      .text(`•   ${a.title}`, x, doc.y, { width: w });
+
+    if (a.description) {
+      doc.font(fonts.body).fontSize(8.5).fillColor(colors.body)
+        .text(a.description, x + 16, doc.y + 1, { width: w - 16, lineGap: 1.2 });
+    }
+    if (a.url) {
+      pageBreak(doc, 14);
+      doc.font(fonts.body).fontSize(7.5).fillColor("#2563eb")
+        .text(a.url, x + 16, doc.y + 1, { width: w - 16, link: a.url, underline: true });
+      doc.y += 3;
+    }
+    if (i < entries.length - 1) doc.y += 4;
+  }
+}
+
+export function renderConferences(
+  doc: PDFKit.PDFDocument,
+  entries: ResumeConference[],
+  x: number, w: number,
+  fonts: { title: string; meta: string },
+  colors: { title: string; meta: string },
+): void {
+  for (let i = 0; i < entries.length; i++) {
+    const c = entries[i];
+    pageBreak(doc, 24);
+
+    const titleLine = c.role ? `${c.name} — ${c.role}` : c.name;
+    doc.font(fonts.title).fontSize(9.5).fillColor(colors.title)
+      .text(titleLine, x, doc.y, { width: w });
+
+    if (c.date) {
+      doc.font(fonts.meta).fontSize(8.5).fillColor(colors.meta)
+        .text(c.date, x, doc.y + 1, { width: w });
+    }
+
+    if (c.url) {
+      doc.font(fonts.meta).fontSize(7.5).fillColor("#2563eb")
+        .text(c.url, x + 8, doc.y + 1, { width: w - 16, link: c.url, underline: true });
+      doc.y += 3;
+    }
+    if (i < entries.length - 1) doc.y += 6;
+  }
+}
+
+/** Generic section renderer for new optional sections. Renders section only if data exists.
+ *  Pass `skip` to exclude sections already rendered elsewhere (e.g. in a sidebar). */
+export function renderOptionalSections(
+  doc: PDFKit.PDFDocument,
+  d: ResumeData,
+  x: number, w: number,
+  sectionTitle: (title: string) => void,
+  fonts: { title: string; body: string; meta: string; bullet: string },
+  colors: { title: string; body: string; meta: string; bullet: string },
+  pillBg: string,
+  pillFg = "#ffffff",
+  skip: string[] = [],
+): void {
+  if (d.volunteer?.length && !skip.includes("volunteer")) {
+    sectionTitle("Volunteer");
+    renderVolunteer(doc, d.volunteer, x, w, fonts, colors);
+    doc.y += 10;
+  }
+  if (d.certifications?.length && !skip.includes("certifications")) {
+    sectionTitle("Certifications");
+    renderCertifications(doc, d.certifications, x, w, fonts, colors);
+    doc.y += 10;
+  }
+  if (d.awards?.length && !skip.includes("awards")) {
+    sectionTitle("Awards");
+    renderAwards(doc, d.awards, x, w, fonts, colors);
+    doc.y += 10;
+  }
+  if (d.languages?.length && !skip.includes("languages")) {
+    sectionTitle("Languages");
+    renderLanguages(doc, d.languages, x, w, fonts, colors);
+    doc.y += 10;
+  }
+  if (d.interests?.length && !skip.includes("interests")) {
+    sectionTitle("Interests");
+    renderSkillsPills(doc, d.interests, x, doc.y, w, pillBg, pillFg);
+    doc.y += 4;
+  }
+  if (d.organizations?.length && !skip.includes("organizations")) {
+    sectionTitle("Organizations");
+    renderOrganizations(doc, d.organizations, x, w, fonts, colors);
+    doc.y += 10;
+  }
+  if (d.achievements?.length && !skip.includes("achievements")) {
+    sectionTitle("Achievements");
+    renderAchievements(doc, d.achievements, x, w, fonts, colors);
+    doc.y += 10;
+  }
+  if (d.conferences?.length && !skip.includes("conferences")) {
+    sectionTitle("Conferences");
+    renderConferences(doc, d.conferences, x, w, fonts, colors);
+    doc.y += 10;
+  }
+  if (d.causes?.length && !skip.includes("causes")) {
+    sectionTitle("Causes");
+    renderSkillsPills(doc, d.causes, x, doc.y, w, pillBg, pillFg);
+    doc.y += 4;
   }
 }
 

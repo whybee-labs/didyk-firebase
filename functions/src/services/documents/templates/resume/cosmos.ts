@@ -1,6 +1,7 @@
 import {
   PW, pageBreak, hr, parseResumeData, getPrimaryColor,
   renderExperience, renderEducation, renderSkillsGrid, renderProjects,
+  renderOptionalSections, contactUrl,
 } from "./helpers";
 
 const DEFAULT_HEADER_BG = "#2c2c2c";
@@ -18,15 +19,45 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
   doc.font("Inter-Bold").fontSize(22).fillColor(textOnHeader)
     .text(d.fullName, M, 20, { width: W * 0.55 });
 
-  const contacts = [d.email, d.phone, d.address].filter(Boolean) as string[];
+  const contacts = [d.email, d.phone, d.linkedin].filter(Boolean) as string[];
   if (contacts.length) {
-    doc.font("Inter").fontSize(8).fillColor(textOnHeader)
-      .text(contacts.join("  |  "), M, doc.y + 3, { width: W });
+    const cY = doc.y + 3;
+    let cx = M;
+    for (let i = 0; i < contacts.length; i++) {
+      const link = contactUrl(contacts[i]);
+      const tw = doc.font("Inter").fontSize(8).widthOfString(contacts[i]);
+      const opts: Record<string, unknown> = { lineBreak: false, width: tw + 1 };
+      if (link) { opts.link = link; opts.underline = true; }
+      doc.font("Inter").fontSize(8).fillColor(textOnHeader)
+        .text(contacts[i], cx, cY, opts);
+      cx += tw;
+      if (i < contacts.length - 1) {
+        const sepW = doc.font("Inter").fontSize(8).widthOfString("  |  ");
+        doc.fillColor(textOnHeader).text("  |  ", cx, cY, { lineBreak: false, width: sepW + 1 });
+        cx += sepW;
+      }
+    }
+    doc.y = cY + 12;
   }
-  if (d.linkedin || d.website) {
-    const links = [d.linkedin, d.website].filter(Boolean) as string[];
-    doc.font("Inter").fontSize(8).fillColor(textOnHeader)
-      .text(links.join("  |  "), M, doc.y + 2, { width: W });
+  if (d.github || d.website || d.address) {
+    const links = [d.github, d.website, d.address].filter(Boolean) as string[];
+    const lY = doc.y + 2;
+    let cx = M;
+    for (let i = 0; i < links.length; i++) {
+      const link = contactUrl(links[i]);
+      const tw = doc.font("Inter").fontSize(8).widthOfString(links[i]);
+      const opts: Record<string, unknown> = { lineBreak: false, width: tw + 1 };
+      if (link) { opts.link = link; opts.underline = true; }
+      doc.font("Inter").fontSize(8).fillColor(textOnHeader)
+        .text(links[i], cx, lY, opts);
+      cx += tw;
+      if (i < links.length - 1) {
+        const sepW = doc.font("Inter").fontSize(8).widthOfString("  |  ");
+        doc.fillColor(textOnHeader).text("  |  ", cx, lY, { lineBreak: false, width: sepW + 1 });
+        cx += sepW;
+      }
+    }
+    doc.y = lY + 12;
   }
 
   doc.font("Inter").fontSize(10).fillColor(textOnHeader)
@@ -82,5 +113,12 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
     renderProjects(doc, d.projects, M, W,
       { title: "Inter-SemiBold", body: "Inter", bullet: "Inter" },
       { title: "#111", body: "#444", bullet: "#444" });
+    doc.y += 8;
   }
+
+  renderOptionalSections(doc, d, M, W,
+    (title) => { pageBreak(doc, 40); doc.font("Inter-SemiBold").fontSize(11).fillColor(headerBg).text(title, M, doc.y, { width: W }); hr(doc, M, doc.y + 2, W, headerBg, 1); doc.y += 8; },
+    { title: "Inter-SemiBold", body: "Inter", meta: "Inter-Italic", bullet: "Inter" },
+    { title: "#111", body: "#333", meta: "#666", bullet: "#444" },
+    headerBg);
 }

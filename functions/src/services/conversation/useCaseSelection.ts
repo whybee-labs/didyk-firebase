@@ -59,19 +59,17 @@ export async function handleUseCaseSelection(
   }
 
   const isResume = conversation.useCase === "resume";
-  const nextStatus = isResume ? "selecting_color" : conversation.status;
 
   await db.collection("conversations").doc(conversation.conversationId).update({
     selectedUseCaseIds: [message.listId],
-    status: nextStatus,
     updatedAt: new Date(),
   });
 
-  const updatedConversation = { ...conversation, selectedUseCaseIds: [message.listId], status: nextStatus };
+  const updatedConversation = { ...conversation, selectedUseCaseIds: [message.listId] };
 
   if (isResume) {
-    const { sendResumeColorOptions } = await import("services/conversation/resumeColorSelection");
-    await sendResumeColorOptions(phone, updatedConversation);
+    const { advanceResumeFlow } = await import("services/conversation/resumeFlowRouter");
+    await advanceResumeFlow(phone, updatedConversation);
     return;
   }
 

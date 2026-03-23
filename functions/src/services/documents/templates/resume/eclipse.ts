@@ -1,6 +1,7 @@
 import {
-  PW, pageBreak, hr, parseResumeData, getPrimaryColor,
+  PW, pageBreak, hr, parseResumeData, getPrimaryColor, autoFitText,
   renderExperience, renderEducation, renderSkillsGrid, renderProjects,
+  renderOptionalSections, renderContactsInline,
 } from "./helpers";
 
 export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): void {
@@ -14,14 +15,14 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
     .text(d.targetRole, M, 40, { width: W, align: "center" });
 
   // Large serif name
-  doc.font("NotoSerif-Bold").fontSize(24).fillColor(DARK)
+  const nameSize = autoFitText(doc, d.fullName, "NotoSerif-Bold", 24, 14, W);
+  doc.font("NotoSerif-Bold").fontSize(nameSize).fillColor(DARK)
     .text(d.fullName, M, doc.y + 3, { width: W, align: "center" });
 
   // Contact line
-  const contacts = [d.address, d.email, d.phone, d.linkedin, d.website].filter(Boolean) as string[];
+  const contacts = [d.email, d.phone, d.linkedin, d.github, d.website, d.address].filter(Boolean) as string[];
   if (contacts.length) {
-    doc.font("Inter").fontSize(7.5).fillColor("#666666")
-      .text(contacts.join("   •   "), M, doc.y + 5, { width: W, align: "center" });
+    renderContactsInline(doc, contacts, M, doc.y + 5, W, "Inter", 7.5, "#666666");
   }
 
   let y = doc.y + 10;
@@ -91,5 +92,12 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
       { title: "Inter-SemiBold", body: "Inter", bullet: "Inter" },
       { title: "#111", body: "#444", bullet: "#444" },
     );
+    doc.y += 10;
   }
+
+  renderOptionalSections(doc, d, M, W,
+    (title) => { pageBreak(doc, 40); doc.font("NotoSerif-Bold").fontSize(10.5).fillColor(DARK).text(title.toUpperCase(), M, doc.y, { width: W }); hr(doc, M, doc.y + 3, W, DARK, 0.3); doc.y += 8; },
+    { title: "Inter-SemiBold", body: "Inter", meta: "Inter-Italic", bullet: "Inter" },
+    { title: "#111", body: "#333", meta: "#666", bullet: "#444" },
+    DARK);
 }

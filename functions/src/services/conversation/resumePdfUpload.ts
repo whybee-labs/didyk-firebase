@@ -2,7 +2,14 @@ import { logger } from "firebase-functions";
 import { db } from "utils/firestore";
 import { sendText } from "services/whatsapp/sendText";
 import { downloadWhatsAppMedia } from "services/whatsapp/getMedia";
-import { parseResumeFromPdf, formatResumeSummaryFull } from "services/resume/parseResumePdf";
+import {
+  parseResumeFromPdf,
+  formatResumeSummaryProfile,
+  formatResumeSummaryExperience,
+  formatResumeSummaryProjects,
+  formatResumeSummaryOptional,
+} from "services/resume/parseResumePdf";
+import { callOpenAI } from "services/llm/openai";
 import { Conversation } from "./handleIncomingMessage";
 import { t } from "utils/t";
 
@@ -16,6 +23,63 @@ function forFirestore(obj: unknown): unknown {
     out[k] = forFirestore(v);
   }
   return out;
+}
+
+export async function sendResumeSectionsForReview(
+  cid: string,
+  phone: string,
+  collectedData: Record<string, unknown>
+): Promise<void> {
+  // Auto-generate summary if missing
+  if (!collectedData.summary || !String(collectedData.summary).trim()) {
+    try {
+      const generated = await generateSummary(collectedData);
+      if (generated) {
+        collectedData.summary = generated;
+        await db.collection("conversations").doc(cid).update({
+          "collectedData.summary": generated,
+          updatedAt: new Date(),
+        });
+      }
+    } catch (err) {
+      logger.warn("Auto-generate summary failed", { err });
+    }
+  }
+
+  const profile = formatResumeSummaryProfile(collectedData);
+  const experience = formatResumeSummaryExperience(collectedData);
+  const projects = formatResumeSummaryProjects(collectedData);
+  const optional = formatResumeSummaryOptional(collectedData);
+
+  await sendText(cid, phone, profile);
+  await sendText(cid, phone, experience);
+  await sendText(cid, phone, projects);
+  await sendText(cid, phone, optional);
+
+  await sendText(cid, phone, t("resume.review.prompt"));
+}
+
+async function generateSummary(data: Record<string, unknown>): Promise<string | null> {
+  const name = [data.firstName, data.lastName].filter(Boolean).join(" ") || "";
+  const role = (data.targetRole as string) || "";
+  const skills = Array.isArray(data.skills) ? data.skills.join(", ") : "";
+  const expCount = Array.isArray(data.experience) ? data.experience.length : 0;
+  const projCount = Array.isArray(data.projects) ? data.projects.length : 0;
+
+  const context = [
+    name && `Name: ${name}`,
+    role && `Target role: ${role}`,
+    skills && `Skills: ${skills}`,
+    expCount && `${expCount} work experience(s)`,
+    projCount && `${projCount} project(s)`,
+  ].filter(Boolean).join(". ");
+
+  if (!context) return null;
+
+  const prompt = `Write a professional 2-3 sentence resume summary for this person. Be concise, confident, and specific. Do NOT use generic filler. Output ONLY the summary text, nothing else.\n\n${context}`;
+  const result = await callOpenAI(prompt, "", true);
+  const trimmed = result.trim().replace(/^["']|["']$/g, "");
+  return trimmed || null;
 }
 
 /**
@@ -57,11 +121,9 @@ export async function handleResumePdfUpload(
 
   await db.collection("conversations").doc(cid).update({
     collectedData: forFirestore(collectedData) as Record<string, unknown>,
-    status: "refining",
-    messageHistory: [],
     updatedAt: new Date(),
   });
 
-  const summaryFull = formatResumeSummaryFull(collectedData);
-  await sendText(cid, phone, `${summaryFull}\n\n${t("resume.upload.parsed")}`);
+  const { advanceResumeFlow } = await import("services/conversation/resumeFlowRouter");
+  await advanceResumeFlow(phone, { ...conversation, collectedData });
 }

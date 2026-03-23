@@ -5,7 +5,7 @@ import {
   WHATSAPP_VERIFY_TOKEN,
   WHATSAPP_ACCESS_TOKEN,
   WHATSAPP_PHONE_NUMBER_ID,
-  GROQ_API_KEY,
+  OPENAI_API_KEY,
   RAZORPAY_KEY_ID,
   RAZORPAY_KEY_SECRET,
 } from "config/env";
@@ -13,7 +13,7 @@ import { parseWebhookPayload } from "services/whatsapp/parseWebhookPayload";
 import { handleIncomingMessage } from "services/conversation/handleIncomingMessage";
 
 export const whatsappWebhook = onRequest(
-  { secrets: [WHATSAPP_VERIFY_TOKEN, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, GROQ_API_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET] },
+  { secrets: [WHATSAPP_VERIFY_TOKEN, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, OPENAI_API_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET] },
   async (req, res) => {
     if (req.method === "GET") {
       handleVerification(req, res);

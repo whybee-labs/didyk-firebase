@@ -2,6 +2,7 @@ import { logger } from "firebase-functions";
 import { db } from "utils/firestore";
 import { sendText } from "services/whatsapp/sendText";
 import { sendCTAButton } from "services/whatsapp/sendCTAButton";
+import { sendButtons } from "services/whatsapp/sendButtons";
 import { sendVideo } from "services/whatsapp/sendVideo";
 import { sendImage } from "services/whatsapp/sendImage";
 import { sendDocument } from "services/whatsapp/sendDocument";
@@ -13,6 +14,9 @@ import { templateKeyFromUseCaseId, getResumeColorConfig, textColorForBackground 
 import { createPaymentLink } from "services/payment/createPaymentLink";
 import { Conversation } from "services/conversation/handleIncomingMessage";
 import { t } from "utils/t";
+
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const PREVIEW_BUTTONS_DELAY_MS = 4000;
 
 export async function startFulfillment(phone: string, conversation: Conversation): Promise<void> {
   logger.info("Fulfillment started", { phone, conversationId: conversation.conversationId, useCase: conversation.useCase });
@@ -26,24 +30,8 @@ export async function startFulfillment(phone: string, conversation: Conversation
   const cid = conversation.conversationId;
   const isResume = conversation.useCase === "resume";
 
-  const dataForGenerate = { ...conversation.collectedData };
-  if (isResume && dataForGenerate.firstName != null && dataForGenerate.lastName != null && !dataForGenerate.fullName) {
-    dataForGenerate.fullName = [dataForGenerate.firstName, dataForGenerate.lastName].join(" ").trim();
-  }
-  if (isResume && conversation.selectedPrimaryColor) {
-    const ucId = conversation.selectedUseCaseIds?.[0];
-    const templateKey = ucId ? templateKeyFromUseCaseId(ucId) : "";
-    const colorConfig = getResumeColorConfig(templateKey);
-    const hex = conversation.selectedPrimaryColor;
-    if (colorConfig?.mode === "background") {
-      dataForGenerate.backgroundColor = hex;
-      dataForGenerate.primaryColor = textColorForBackground(hex);
-    } else {
-      dataForGenerate.primaryColor = hex;
-    }
-  }
-
   if (!isResume) {
+    const dataForGenerate = { ...conversation.collectedData };
     await sendText(cid, phone, t("fulfillment.preview"));
     for (const ucId of conversation.selectedUseCaseIds ?? []) {
       const uc = findUseCase(ucId);
@@ -53,40 +41,103 @@ export async function startFulfillment(phone: string, conversation: Conversation
         await dispatchOutput(cid, phone, output.type, result);
       }
     }
+
+    // Non-resume: go straight to payment
+    const currency   = phone.startsWith("91") ? "INR" : "USD";
+    const symbol     = currency === "INR" ? "₹" : "$";
+    const selectedUc = findUseCase(conversation.selectedUseCaseIds?.[0] ?? "");
+    const amount     = selectedUc?.pricing[currency] ?? 0;
+    const { id, shortUrl } = await createPaymentLink(phone, cid, amount, `Whybee ${config.name}`, currency);
+    await sendCTAButton(cid, phone, t("fulfillment.payment"), t("fulfillment.paymentButton", { symbol, amount: String(amount) }), shortUrl);
+    await db.collection("conversations").doc(cid).update({
+      status: "awaiting_payment",
+      paymentData: { linkId: id, amount, currency, createdAt: new Date() },
+      updatedAt: new Date(),
+    });
   } else {
-    // Resume: send preview PDF (with watermark) then payment CTA
+    // Resume: send preview PDF (with watermark) then 3-button prompt
     await sendText(cid, phone, t("fulfillment.previewResume"));
-    const ucId = conversation.selectedUseCaseIds?.[0];
-    const uc = ucId ? findUseCase(ucId) : null;
-    if (uc?.outputs) {
-      for (const output of uc.outputs) {
-        const result = await output.generate({
-          ...dataForGenerate,
-          _phone: phone,
-          _conversationId: cid,
-          _watermark: true,
-        });
-        await dispatchOutput(cid, phone, output.type, result, "resume_preview.pdf");
-      }
+    await generateAndSendResume(phone, cid, conversation.collectedData, conversation.selectedUseCaseIds, conversation.selectedPrimaryColor, true);
+
+    // Wait for user to see the preview before showing action buttons
+    await delay(PREVIEW_BUTTONS_DELAY_MS);
+
+    // Send 3 buttons: Get Final / Change Template / Edit Details
+    await sendButtons(cid, phone, t("fulfillment.previewPrompt"), [
+      { id: "generate_final", title: t("fulfillment.previewGetFinal") },
+      { id: "change_template", title: t("fulfillment.previewChangeTemplate") },
+      { id: "edit_details", title: t("fulfillment.previewEditDetails") },
+    ]);
+
+    await db.collection("conversations").doc(cid).update({
+      status: "reviewing_preview",
+      updatedAt: new Date(),
+    });
+  }
+}
+
+/**
+ * Single function for generating + sending resume outputs.
+ * Both preview (watermark=true) and final (watermark=false) call this,
+ * so colour, sections, and filename are always identical.
+ */
+export async function generateAndSendResume(
+  phone: string,
+  cid: string,
+  collectedData: Record<string, unknown>,
+  selectedUseCaseIds: string[] | undefined,
+  selectedPrimaryColor: string | undefined,
+  watermark: boolean,
+): Promise<number> {
+  const data = { ...collectedData };
+
+  // Derive fullName
+  if (data.firstName != null && data.lastName != null && !data.fullName) {
+    data.fullName = [data.firstName, data.lastName].filter(Boolean).join(" ").trim();
+  }
+
+  // Compute colour
+  const ucId = selectedUseCaseIds?.[0];
+  if (selectedPrimaryColor && ucId) {
+    const templateKey = templateKeyFromUseCaseId(ucId);
+    const colorConfig = getResumeColorConfig(templateKey);
+    if (colorConfig?.mode === "background") {
+      data.backgroundColor = selectedPrimaryColor;
+      data.primaryColor = textColorForBackground(selectedPrimaryColor);
+    } else {
+      data.primaryColor = selectedPrimaryColor;
     }
   }
 
-  // Detect currency from phone country code (+91 = India = INR, everything else = USD)
-  const currency   = phone.startsWith("91") ? "INR" : "USD";
-  const symbol     = currency === "INR" ? "₹" : "$";
-  const selectedUc = findUseCase(conversation.selectedUseCaseIds?.[0] ?? "");
-  const amount     = selectedUc?.pricing[currency] ?? 0;
+  const suffix = watermark ? "preview" : "resume";
+  const filename = `${sanitizeResumeFilename(data.fullName)}_${suffix}.pdf`;
 
-  // Create Razorpay payment link and send to user
-  const { id, shortUrl } = await createPaymentLink(phone, cid, amount, `Whybee ${config.name}`, currency);
+  let dispatched = 0;
+  if (ucId) {
+    const uc = findUseCase(ucId);
+    if (uc?.outputs) {
+      for (const output of uc.outputs) {
+        const result = await output.generate({
+          ...data,
+          _phone: phone,
+          _conversationId: cid,
+          _watermark: watermark,
+        });
+        await dispatchOutput(cid, phone, output.type, result, filename);
+        dispatched++;
+      }
+    } else {
+      logger.error("Resume use case not found or has no outputs", { ucId });
+    }
+  }
 
-  await sendCTAButton(cid, phone, t("fulfillment.payment"), t("fulfillment.paymentButton", { symbol, amount: String(amount) }), shortUrl);
+  return dispatched;
+}
 
-  await db.collection("conversations").doc(cid).update({
-    status: "awaiting_payment",
-    paymentData: { linkId: id, amount, currency, createdAt: new Date() },
-    updatedAt: new Date(),
-  });
+function sanitizeResumeFilename(fullName: unknown): string {
+  if (fullName == null || typeof fullName !== "string") return "resume";
+  const s = fullName.trim().replace(/\s+/g, "_").replace(/[/\\:*?"<>|]/g, "");
+  return (s || "resume").slice(0, 80);
 }
 
 async function dispatchOutput(

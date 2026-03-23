@@ -1,6 +1,7 @@
 import {
-  PW, pageBreak, hr, parseResumeData, getPrimaryColor,
+  PW, pageBreak, hr, parseResumeData, getPrimaryColor, autoFitText,
   renderExperience, renderEducation, renderSkillsGrid, renderProjects,
+  renderOptionalSections, renderContactsInline,
 } from "./helpers";
 
 export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): void {
@@ -10,7 +11,8 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
   const NAVY = getPrimaryColor(d, "#1a2744");
 
   // Name (bold, uppercase, centered, serif)
-  doc.font("NotoSerif-Bold").fontSize(22).fillColor(NAVY)
+  const nameSize = autoFitText(doc, d.fullName.toUpperCase(), "NotoSerif-Bold", 22, 14, W, 2);
+  doc.font("NotoSerif-Bold").fontSize(nameSize).fillColor(NAVY)
     .text(d.fullName.toUpperCase(), M, 38, { width: W, align: "center", characterSpacing: 2 });
 
   // Role
@@ -18,10 +20,9 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
     .text(d.targetRole, M, doc.y + 3, { width: W, align: "center" });
 
   // Contact line
-  const contacts = [d.address, d.email, d.phone, d.linkedin].filter(Boolean) as string[];
+  const contacts = [d.email, d.phone, d.linkedin, d.github, d.address].filter(Boolean) as string[];
   if (contacts.length) {
-    doc.font("Inter").fontSize(7.5).fillColor("#666666")
-      .text(contacts.join("     •     "), M, doc.y + 5, { width: W, align: "center" });
+    renderContactsInline(doc, contacts, M, doc.y + 5, W, "Inter", 7.5, "#666666");
   }
 
   let y = doc.y + 10;
@@ -93,5 +94,12 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
       { title: "NotoSerif-Bold", body: "NotoSerif", bullet: "NotoSerif" },
       { title: NAVY, body: "#444", bullet: "#444" },
     );
+    doc.y += 12;
   }
+
+  renderOptionalSections(doc, d, M, W,
+    (title) => { pageBreak(doc, 40); doc.y = centeredHeading(title.toUpperCase(), doc.y); },
+    { title: "NotoSerif-Bold", body: "NotoSerif", meta: "NotoSerif-Italic", bullet: "NotoSerif" },
+    { title: NAVY, body: "#333", meta: "#666", bullet: "#444" },
+    NAVY);
 }

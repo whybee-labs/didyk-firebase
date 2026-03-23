@@ -28,6 +28,7 @@ selectedFilters      { withPhoto?: "yes"|"no"|"both" } — resume only: filter b
 selectedUseCaseIds   string[]                  — use case IDs chosen at selecting_usecases step
 selectedPrimaryColor string                    — resume: chosen colour (hex) for template
 inputMethod         "upload" | "scratch"       — resume: upload PDF vs build from scratch
+dataConfirmed        boolean                   — resume: true when user typed "done" in reviewing_resume; gate for preview generation
 paymentData          { linkId, amount, createdAt, paidAt? } — set during fulfillment
 lastMessageAt        Timestamp  — updated on every incoming message (used for idle timeout)
 createdAt            Timestamp
@@ -50,33 +51,39 @@ updatedAt            Timestamp
             └──────┬───────┘
                    │ Resume selected → sample image + template list (no filter step)
             ┌──────▼────────────┐
-            │ selecting_usecases│  ← resume: pick one of 10 templates; others: "What would you like created?"
+            │ selecting_usecases│  ← resume: pick one of 9 templates; others: "What would you like created?"
             └──────┬────────────┘
-                   │ use case selected
+                   │ use case selected → advanceResumeFlow()
             ┌──────▼────────────┐
             │ selecting_color  │  ← resume only: bg-mode (background options) or text-mode (accent options) list
             └──────┬────────────┘
-                   │ colour chosen
+                   │ colour chosen → advanceResumeFlow()
             ┌──────▼────────────────┐
             │ choose_input_method   │  ← resume only: [Upload your PDF] [Build from scratch] buttons
             └──────┬────────────────┘
                    │ "Build from scratch" → refining; "Upload your PDF" → waiting_for_pdf
             ┌──────▼──────────────┐
-            │ waiting_for_pdf     │  ← resume only: user sends document; we parse (pdf-parse + LLM), prefill, → refining
+            │ waiting_for_pdf     │  ← resume only: user sends document; we parse (pdf-parse + LLM), prefill
             └──────┬──────────────┘
-                   │ PDF parsed and summary sent (or scratch chosen)
+                   │ PDF parsed → advanceResumeFlow()
             ┌──────▼───────┐
-            │   refining   │  ← LLM collecting fields / edits (resume: name+role required; optional/skip; add/remove/replace)
+            │   refining   │  ← LLM collecting fields / edits (resume: name+role required)
             └──────┬───────┘
-                   │ required fields complete
-            ┌──────▼───────┐
-            │  confirming  │  ← summary + [✅ Create it!] [🔄 Start Over] buttons
-            └──────┬───────┘
-                   │ "Create it!" tapped
+                   │ required fields complete → advanceResumeFlow()
+            ┌──────▼──────────────┐
+            │ reviewing_resume    │  ← show section review messages; user edits until typing "done"
+            └──────┬──────────────┘
+                   │ user types "done" → sets dataConfirmed=true → advanceResumeFlow()
             ┌──────▼───────┐
             │  generating  │  ← brief state during output generation
             └──────┬───────┘
-                   │ all outputs sent + payment link created
+                   │ preview PDF sent (4s delay)
+            ┌──────▼──────────────┐
+            │ reviewing_preview   │  ← resume only: 3 buttons [📄 Get Final Resume] [🎨 Change Template] [✏️ Edit Details]
+            └──────┬──────────────┘
+                   │ "Get Final Resume" → payment link created
+                   │ "Change Template" → clears template+color → advanceResumeFlow() (skips filled steps)
+                   │ "Edit Details" → sets dataConfirmed=false → advanceResumeFlow() → reviewing_resume
             ┌──────▼──────────┐
             │ awaiting_payment │  ← CTA button sent, waiting for Razorpay payment
             └──────┬──────────┘
@@ -88,9 +95,28 @@ updatedAt            Timestamp
 "Start Over" at confirming → resets the same conversation doc back to discovery
 (status, useCase, collectedData, browsePath, selectedUseCaseIds cleared — no new document created)
 
-"hi" at any status → same reset (clears all fields, sends welcome again)
+"hi" at any status → same reset (clears all fields including dataConfirmed, sends welcome again)
 ```
 
+### Resume Flow Router (`advanceResumeFlow`)
+
+All resume state transitions go through `services/conversation/resumeFlowRouter.ts`.
+It checks prerequisites in order and routes to the next unfilled step:
+
+| # | Field | Missing → Status |
+|---|-------|------------------|
+| 1 | `selectedUseCaseIds` | `selecting_usecases` |
+| 2 | `selectedPrimaryColor` | `selecting_color` |
+| 3 | `inputMethod` | `choose_input_method` |
+| 4 | Required data (firstName, lastName, targetRole) | `waiting_for_pdf` or `refining` |
+| 5 | `dataConfirmed` | `reviewing_resume` |
+
+All filled → `startFulfillment()` → generate preview.
+
+This means "Change Template" from preview skips input method and data collection
+(they're already filled), going straight to preview after template + colour are re-selected.
+
+Note: `confirming` is used for non-resume products only. Resume uses `reviewing_resume` + `dataConfirmed` instead.
 Note: `form_sent` is a legacy status for WhatsApp Form (nfm_reply) submissions. Not triggered by the current catalog flow.
 
 ---
@@ -121,7 +147,9 @@ switch (conversation.status) {
   case "choose_input_method":   → handleInputMethodSelection() / sendInputMethodPrompt()  // resume: Upload vs Scratch
   case "waiting_for_pdf":       → handleResumePdfUpload() on document; else nudge  // resume: parse PDF, prefill
   case "confirming":            → handleConfirmation()
+  case "reviewing_resume":       → edit via chat; "done" → regenerate preview (if template selected) or confirm
   case "generating":            → "Still working on it, hang tight!"
+  case "reviewing_preview":     → 3 buttons: generate_final / change_template / edit_details; text → edit flow
   case "awaiting_payment":      → "Please complete your payment using the link sent above."
   default:                      → discovery()
 }
@@ -184,12 +212,18 @@ Triggered when `status === "refining"`. Called after product selection and on ev
 - Saved to Firestore immediately; progress feedback sent to user
 - Re-runs the completion check
 
-**Text messages** — LLM extracts all fields at once:
-- Builds a prompt listing all fields + their current values
-- LLM returns `{ extractedFields }` — extracts everything it can in one pass
-- Saves extracted fields to Firestore
-- If all required fields are complete → calls `sendUseCaseSelection()`
-- Otherwise → sends a single follow-up asking for **all** remaining missing fields at once (not one at a time)
+**LLM:** Uses Google Gemini (`gemini-2.0-flash`) via OpenAI-compatible API. Requires `GEMINI_API_KEY` Firebase secret.
+
+**Text messages** — LLM extracts fields:
+- **User journey:** Sends status, product, selected template (name + description), input method, browse path, conversation turn count
+- **Resume:** Sends schema + full `collectedData` JSON + indexed view (Experience 0, Bullet 0, etc.) for targeted edits
+- **Initial collection** (empty/minimal data): extract what user provides
+- **Edit mode** (substantial data): default to no change — only output when user explicitly asks to change/add/remove/update
+- **Anti-hallucination:** LLM treats `collectedData` as source of truth; never invents companies, roles, bullets
+- **Partial edits:** "Remove bullet with lorem ipsum" → remove only that bullet; "change first bullet at Google" → change only that one; copy all others verbatim
+- LLM returns `{ extractedFields }` — saves to Firestore
+- If all required fields complete → calls `sendUseCaseSelection()`
+- Otherwise → sends follow-up asking for remaining missing fields
 
 **Follow-up logic (`buildFollowUpQuestion`):**
 1. If text fields still missing → ask for all of them in one message
@@ -242,11 +276,21 @@ Triggered when refining completes. Sends a list of available use cases for the p
 See [media-generation.md](./media-generation.md) for how outputs are generated and [payment.md](./payment.md) for the payment flow.
 
 1. Sets `status: "generating"`
-2. Sends preview message (`"🎬 Here's your preview!"`)
+2. Sends preview message
 3. Iterates `conversation.selectedUseCaseIds`, looks up each `CatalogUseCase` via `findUseCase(id)`, generates and sends all outputs
-4. Creates Razorpay payment link
-5. Sends CTA button (`"💳 To receive your final files, please complete payment:"` + `"Complete Payment"` button)
-6. Sets `status: "awaiting_payment"`, stores `paymentData: { linkId, amount, createdAt }`
+
+**Non-resume products:**
+4. Creates Razorpay payment link → CTA button → `status: "awaiting_payment"`
+
+**Resume:**
+4. Sends 3-button prompt: `Get Final Resume` / `Change Template` / `Edit Details`
+5. Sets `status: "reviewing_preview"`
+
+**`reviewing_preview` handlers:**
+- `generate_final` → creates payment link, sends CTA → `status: "awaiting_payment"`
+- `change_template` → clears `selectedUseCaseIds`/`selectedPrimaryColor`, sends template list → `status: "selecting_usecases"`
+- `edit_details` → sends section review messages → `status: "reviewing_resume"`
+- Text message → treated as edit intent, processes via flowEngine, then sends updated section review
 
 ---
 

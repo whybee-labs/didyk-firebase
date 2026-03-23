@@ -9,6 +9,8 @@ functions/lib/
 
 # Dependencies
 functions/node_modules/
+simulator/node_modules/
+simulator/uploads/
 
 # Environment
 *.local

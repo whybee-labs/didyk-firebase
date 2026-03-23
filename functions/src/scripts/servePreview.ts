@@ -17,10 +17,10 @@ const PREVIEW_DIR = path.join(process.cwd(), "preview");
 
 import { RESUME_COLOR_CONFIG as SHARED_CONFIG, textColorForBackground } from "config/resumeColors";
 
-// Map shared config to preview format (mode + hex array)
-const RESUME_COLOR_CONFIG: Record<string, { mode: "background" | "text"; colors: string[] }> = {};
+// Map shared config to preview format (mode + colors with hex & label)
+const RESUME_COLOR_CONFIG: Record<string, { mode: "background" | "text"; colors: { hex: string; label: string }[] }> = {};
 for (const [key, cfg] of Object.entries(SHARED_CONFIG)) {
-  RESUME_COLOR_CONFIG[key] = { mode: cfg.mode, colors: cfg.colors.map((c) => c.hex) };
+  RESUME_COLOR_CONFIG[key] = { mode: cfg.mode, colors: cfg.colors.map((c) => ({ hex: c.hex, label: c.label })) };
 }
 
 // Invite templates: no colour picking (empty array → client falls back to static PDF)
@@ -29,7 +29,7 @@ const INVITE_DATA: Record<string, Record<string, unknown>> = Object.fromEntries(
 );
 
 // Combined map for /templates: resume get { mode, colors }; invites get []
-const TEMPLATE_COLORS: Record<string, { mode: "background" | "text"; colors: string[] } | string[]> = {
+const TEMPLATE_COLORS: Record<string, { mode: "background" | "text"; colors: { hex: string; label: string }[] } | string[]> = {
   ...RESUME_COLOR_CONFIG,
   ...Object.fromEntries(INVITE_TEMPLATES.map((t) => [t.key, [] as string[]])),
 };

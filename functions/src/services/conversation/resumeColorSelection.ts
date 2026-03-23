@@ -4,7 +4,6 @@ import { sendText } from "services/whatsapp/sendText";
 import { templateKeyFromUseCaseId, getResumeColorConfig } from "config/resumeColors";
 import { Conversation } from "./handleIncomingMessage";
 import { t } from "utils/t";
-import { sendInputMethodPrompt } from "./resumeInputMethod";
 
 /**
  * Send colour options (background or accent) after user picked a resume template.
@@ -19,16 +18,14 @@ export async function sendResumeColorOptions(phone: string, conversation: Conver
   const templateKey = templateKeyFromUseCaseId(ucId);
   const config = getResumeColorConfig(templateKey);
   if (!config || config.colors.length === 0) {
-    await db.collection("conversations").doc(conversation.conversationId).update({
-      status: "choose_input_method",
-      updatedAt: new Date(),
-    });
-    await sendInputMethodPrompt(phone, { ...conversation, status: "choose_input_method", selectedPrimaryColor: undefined });
+    // No colour options for this template — skip colour step via router
+    const { advanceResumeFlow } = await import("services/conversation/resumeFlowRouter");
+    await advanceResumeFlow(phone, conversation);
     return;
   }
 
   const intro = config.mode === "background" ? t("resume.color.bgIntro") : t("resume.color.textIntro");
-  const rows = config.colors.map((opt) => ({ id: opt.id, title: opt.label, description: undefined }));
+  const rows = config.colors.map((opt) => ({ id: opt.id, title: opt.label, description: opt.tag }));
   const sections = [];
   const ROWS_PER_SECTION = 10;
   for (let i = 0; i < rows.length; i += ROWS_PER_SECTION) {
@@ -65,9 +62,9 @@ export async function handleColorSelection(
 
   await db.collection("conversations").doc(conversation.conversationId).update({
     selectedPrimaryColor: hex,
-    status: "choose_input_method",
     updatedAt: new Date(),
   });
 
-  await sendInputMethodPrompt(phone, { ...conversation, selectedPrimaryColor: hex, status: "choose_input_method" });
+  const { advanceResumeFlow } = await import("services/conversation/resumeFlowRouter");
+  await advanceResumeFlow(phone, { ...conversation, selectedPrimaryColor: hex });
 }

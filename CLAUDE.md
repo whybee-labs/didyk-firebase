@@ -6,14 +6,14 @@
 - Firebase Storage (generated media — not yet implemented)
 - WhatsApp Cloud API (Meta) for all user interactions
 - Razorpay for payments
-- Groq (`llama-3.1-8b-instant`) via OpenAI-compatible SDK for LLM calls
+- Google Gemini (`gemini-2.0-flash`) via OpenAI-compatible SDK for LLM calls (GEMINI_API_KEY secret)
 
 ## Project Structure
 ```
 functions/src/
   api/              # Firebase Function entry points
   config/
-    env.ts          # Firebase secrets (GROQ_API_KEY, WHATSAPP_*, RAZORPAY_*)
+    env.ts          # Firebase secrets (GEMINI_API_KEY, WHATSAPP_*, RAZORPAY_*)
     products/       # Per-product config (birthday, business, event) + types
     catalog/        # Full product catalog hierarchy (categories → products → use cases)
     translations.json  # All user-facing copy — edit here for content changes
@@ -22,7 +22,7 @@ functions/src/
   services/
     conversation/   # State machine: discovery → browsing → refining → selecting_usecases → confirming → generating → awaiting_payment
     generators/     # Output stubs: video, image, pdf, audio, text
-    llm/            # callOpenAI() — wraps Groq via OpenAI SDK
+    llm/            # callOpenAI() — wraps Gemini via OpenAI SDK
     payments/       # Razorpay createPaymentLink
     whatsapp/       # Senders (text, video, image, audio, document, buttons, list) + webhook parser
 docs/               # Architecture docs — keep updated when business logic changes

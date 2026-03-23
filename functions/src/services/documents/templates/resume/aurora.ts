@@ -1,6 +1,7 @@
 import {
-  PW, pageBreak, parseResumeData, getPrimaryColor, renderResumePhoto,
+  PW, pageBreak, parseResumeData, getPrimaryColor, autoFitText,
   renderExperience, renderEducation, renderSkillsPills, renderProjects,
+  renderOptionalSections, renderContactItem,
 } from "./helpers";
 
 const DEFAULT_HEADER_BG = "#fce4ec";
@@ -15,22 +16,20 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
 
   doc.rect(0, 0, PW * 0.44, 118).fill(headerBg);
 
-  renderResumePhoto(doc, data, M + 36, 38, 32, "#e8b0c0", "#f0c0d0", -4);
-
-  doc.font("NotoSerif-Bold").fontSize(24).fillColor(textOnHeader)
-    .text(d.fullName, M, 65, { width: PW * 0.38 });
+  const nameSize = autoFitText(doc, d.fullName, "NotoSerif-Bold", 24, 14, PW * 0.38);
+  doc.font("NotoSerif-Bold").fontSize(nameSize).fillColor(textOnHeader)
+    .text(d.fullName, M, 28, { width: PW * 0.38 });
   doc.font("Inter").fontSize(9).fillColor(textOnHeader)
     .text(d.targetRole.toUpperCase(), M, doc.y + 3, { width: PW * 0.38, characterSpacing: 0.8 });
 
   // Contact info as rounded pills on the right
   let cY = 22;
-  const contacts = [d.email, d.phone, d.address, d.linkedin, d.website].filter(Boolean) as string[];
+  const contacts = [d.email, d.phone, d.linkedin, d.github, d.website, d.address].filter(Boolean) as string[];
   const pillX = PW * 0.48;
   const pillW = PW * 0.48;
   for (const c of contacts) {
     doc.roundedRect(pillX, cY, pillW, 18, 4).fill("#f5f5f5");
-    doc.font("Inter").fontSize(8).fillColor("#444")
-      .text(c, pillX + 10, cY + 5, { width: pillW - 20 });
+    renderContactItem(doc, c, pillX + 10, cY + 5, pillW - 20, "Inter", 8, "#444");
     cY += 23;
   }
 
@@ -82,5 +81,12 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
     renderProjects(doc, d.projects, M, W,
       { title: "Inter-SemiBold", body: "Inter", bullet: "Inter" },
       { title: "#111", body: "#444", bullet: "#444" });
+    doc.y += 8;
   }
+
+  renderOptionalSections(doc, d, M, W,
+    (title) => heading(title),
+    { title: "Inter-SemiBold", body: "Inter", meta: "Inter-Italic", bullet: "Inter" },
+    { title: "#111", body: "#333", meta: "#666", bullet: "#444" },
+    headerBg, textOnHeader);
 }
