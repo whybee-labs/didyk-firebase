@@ -5,7 +5,7 @@ import {
   WHATSAPP_VERIFY_TOKEN,
   WHATSAPP_ACCESS_TOKEN,
   WHATSAPP_PHONE_NUMBER_ID,
-  GROQ_API_KEY,
+  OPENAI_API_KEY,
   RAZORPAY_KEY_ID,
   RAZORPAY_KEY_SECRET,
 } from "config/env";
@@ -13,7 +13,7 @@ import { parseWebhookPayload } from "services/whatsapp/parseWebhookPayload";
 import { handleIncomingMessage } from "services/conversation/handleIncomingMessage";
 
 export const whatsappWebhook = onRequest(
-  { secrets: [WHATSAPP_VERIFY_TOKEN, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, GROQ_API_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET] },
+  { secrets: [WHATSAPP_VERIFY_TOKEN, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, OPENAI_API_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET] },
   async (req, res) => {
     if (req.method === "GET") {
       handleVerification(req, res);
@@ -56,6 +56,8 @@ async function handleIncoming(req: Request, res: Response): Promise<void> {
   try {
     await handleIncomingMessage(parsed.phone, parsed);
   } catch (err) {
-    logger.error("Error handling incoming message", { err });
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    logger.error("Error handling incoming message", { message, stack });
   }
 }

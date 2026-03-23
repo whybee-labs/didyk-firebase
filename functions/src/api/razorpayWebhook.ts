@@ -89,31 +89,55 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
   }
 
   const phone = convData?.phone as string;
-  const selectedUseCaseIds: string[] = convData?.selectedUseCaseIds ?? [];
-  const collectedData: Record<string, unknown> = convData?.collectedData ?? {};
+  const useCase = convData?.useCase as string | undefined;
 
   await sendText(conversationId, phone, t("fulfillment.delivering"));
 
-  let allSucceeded = true;
+  let outputsDispatched = 0;
 
-  for (const ucId of selectedUseCaseIds) {
-    const uc = findUseCase(ucId);
-    if (!uc?.outputs) continue;
-    for (const output of uc.outputs) {
-      try {
-        const result = await output.generate({
-          ...collectedData,
-          _watermark: false,
-          _phone: phone,
-          _conversationId: conversationId,
-        });
-        await dispatchOutput(conversationId, phone, output.type, result);
-      } catch (err) {
-        allSucceeded = false;
-        logger.error("Output generation failed", { ucId, type: output.type, err });
-        await sendText(conversationId, phone, t("errors.outputFailed")).catch(() => undefined);
+  if (useCase === "resume") {
+    // Same function as preview — only _watermark differs
+    try {
+      const { generateAndSendResume } = await import("services/conversation/fulfillment");
+      outputsDispatched = await generateAndSendResume(
+        phone,
+        conversationId,
+        (convData?.collectedData ?? {}) as Record<string, unknown>,
+        (convData?.selectedUseCaseIds ?? []) as string[],
+        convData?.selectedPrimaryColor as string | undefined,
+        false,
+      );
+    } catch (err) {
+      logger.error("Resume final generation failed", { conversationId, err });
+      await sendText(conversationId, phone, t("errors.outputFailed")).catch(() => undefined);
+    }
+  } else {
+    const selectedUseCaseIds: string[] = convData?.selectedUseCaseIds ?? [];
+    const collectedData: Record<string, unknown> = { ...(convData?.collectedData ?? {}) };
+    for (const ucId of selectedUseCaseIds) {
+      const uc = findUseCase(ucId);
+      if (!uc?.outputs) continue;
+      for (const output of uc.outputs) {
+        try {
+          const result = await output.generate({
+            ...collectedData,
+            _watermark: false,
+            _phone: phone,
+            _conversationId: conversationId,
+          });
+          await dispatchOutput(conversationId, phone, output.type, result);
+          outputsDispatched++;
+        } catch (err) {
+          logger.error("Output generation failed", { ucId, type: output.type, err });
+          await sendText(conversationId, phone, t("errors.outputFailed")).catch(() => undefined);
+        }
       }
     }
+  }
+
+  if (outputsDispatched === 0) {
+    logger.error("No outputs dispatched after payment", { conversationId });
+    await sendText(conversationId, phone, t("errors.outputFailed")).catch(() => undefined);
   }
 
   await db.collection("conversations").doc(conversationId).update({
@@ -127,14 +151,20 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
   // Ask for feedback — this also sets status to "awaiting_feedback"
   await sendFeedbackRequest(conversationId, phone);
 
-  logger.info("Payment confirmed, outputs dispatched", { conversationId, phone, allSucceeded });
+  logger.info("Payment confirmed, outputs dispatched", { conversationId, phone, outputsDispatched });
 }
 
-async function dispatchOutput(conversationId: string, phone: string, type: OutputType, value: string): Promise<void> {
+async function dispatchOutput(
+  conversationId: string,
+  phone: string,
+  type: OutputType,
+  value: string,
+  pdfFilename?: string
+): Promise<void> {
   switch (type) {
     case "video":  return sendVideo(conversationId, phone, value);
     case "image":  return sendImage(conversationId, phone, value);
-    case "pdf":    return sendDocument(conversationId, phone, value, "whybee.pdf");
+    case "pdf":    return sendDocument(conversationId, phone, value, pdfFilename ?? "whybee.pdf");
     case "audio":  return sendAudio(conversationId, phone, value);
     case "text":   return sendText(conversationId, phone, value);
   }

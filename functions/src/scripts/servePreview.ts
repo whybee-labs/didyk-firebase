@@ -15,36 +15,28 @@ import { INVITE_TEMPLATES } from "./previewInvites";
 const PORT = 4174;
 const PREVIEW_DIR = path.join(process.cwd(), "preview");
 
-// Resume templates support accent colour swatches
-const RESUME_COLORS: Record<string, string[]> = {
-  astralis:  ["#2d6a4f", "#1a2744", "#d4637a"],
-  eclipse:   ["#1a1a1a", "#1a2744", "#2d6a4f"],
-  comet:     ["#fdd835", "#2d6a4f", "#d4637a"],
-  nebula:    ["#1a2744", "#2d6a4f", "#7b1fa2"],
-  cosmos:    ["#e67e22", "#1a2744", "#2d6a4f"],
-  celestial: ["#1a2744", "#2d6a4f", "#c0392b"],
-  galaxy:    ["#1a2744", "#2d6a4f", "#7b1fa2"],
-  astral:    ["#1a2744", "#c9a96e", "#2d6a4f"],
-  lunar:     ["#1a2744", "#2d6a4f", "#7b1fa2"],
-  aurora:    ["#d4637a", "#2d6a4f", "#1a2744"],
-  solstice:  ["#1a1a1a", "#1a2744", "#2d6a4f"],
-  ats:       ["#1a2744", "#2d6a4f", "#c0392b"],
-};
+import { RESUME_COLOR_CONFIG as SHARED_CONFIG, textColorForBackground } from "config/resumeColors";
+
+// Map shared config to preview format (mode + colors with hex & label)
+const RESUME_COLOR_CONFIG: Record<string, { mode: "background" | "text"; colors: { hex: string; label: string }[] }> = {};
+for (const [key, cfg] of Object.entries(SHARED_CONFIG)) {
+  RESUME_COLOR_CONFIG[key] = { mode: cfg.mode, colors: cfg.colors.map((c) => ({ hex: c.hex, label: c.label })) };
+}
 
 // Invite templates: no colour picking (empty array → client falls back to static PDF)
 const INVITE_DATA: Record<string, Record<string, unknown>> = Object.fromEntries(
   INVITE_TEMPLATES.map((t) => [t.key, t.data]),
 );
 
-// Combined map returned by /templates
-const TEMPLATE_COLORS: Record<string, string[]> = {
-  ...RESUME_COLORS,
+// Combined map for /templates: resume get { mode, colors }; invites get []
+const TEMPLATE_COLORS: Record<string, { mode: "background" | "text"; colors: { hex: string; label: string }[] } | string[]> = {
+  ...RESUME_COLOR_CONFIG,
   ...Object.fromEntries(INVITE_TEMPLATES.map((t) => [t.key, [] as string[]])),
 };
 
 function generatePdfBuffer(
   templateKey: string,
-  primaryColor: string,
+  colorHex: string,
 ): Promise<{ buffer: Buffer; timeMs: number }> {
   const isInvite = templateKey in INVITE_DATA;
   const renderFn = isInvite
@@ -52,9 +44,20 @@ function generatePdfBuffer(
     : resumeTemplates[templateKey]?.render;
   if (!renderFn) return Promise.reject(new Error(`Unknown template: ${templateKey}`));
 
-  const data: Record<string, unknown> = isInvite
-    ? INVITE_DATA[templateKey]
-    : { ...SAMPLE_DATA, primaryColor };
+  let data: Record<string, unknown>;
+  if (isInvite) {
+    data = INVITE_DATA[templateKey];
+  } else {
+    const config = RESUME_COLOR_CONFIG[templateKey];
+    const mode = config?.mode ?? "text";
+    if (mode === "background") {
+      const backgroundColor = colorHex.startsWith("#") ? colorHex : `#${colorHex}`;
+      const primaryColor = textColorForBackground(backgroundColor);
+      data = { ...SAMPLE_DATA, backgroundColor, primaryColor };
+    } else {
+      data = { ...SAMPLE_DATA, primaryColor: colorHex.startsWith("#") ? colorHex : `#${colorHex}` };
+    }
+  }
 
   const start = Date.now();
   const chunks: Buffer[] = [];
@@ -136,4 +139,17 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`Preview server: http://localhost:${PORT}`);
+});
+server.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EADDRINUSE") {
+    // eslint-disable-next-line no-console
+    console.error(
+      `\nPort ${PORT} is in use. Free it then run npm run preview:serve again.\n` +
+        `  Mac/Linux:  lsof -ti :${PORT} | xargs kill -9\n` +
+        `  Windows:    netstat -ano | findstr :${PORT}   (find PID in last column)\n` +
+        `              taskkill /F /PID <PID>\n`
+    );
+    process.exit(1);
+  }
+  throw err;
 });

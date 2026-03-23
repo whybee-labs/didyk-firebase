@@ -2,11 +2,11 @@ import { logger } from "firebase-functions";
 import { db } from "utils/firestore";
 import { ParsedMessage } from "services/whatsapp/parseWebhookPayload";
 import { sendButtons } from "services/whatsapp/sendButtons";
-import { sendList } from "services/whatsapp/sendList";
-import { catalog, findProduct, popularProducts } from "config/catalog";
+import { sendText } from "services/whatsapp/sendText";
+import { findProduct, LIVE_PRODUCT_ID, popularProducts } from "config/catalog";
 import { UseCase } from "config/products";
 import { Conversation } from "services/conversation/handleIncomingMessage";
-import { t } from "utils/t";
+import { t, TranslationKey } from "utils/t";
 
 export async function discovery(
   phone: string,
@@ -15,16 +15,24 @@ export async function discovery(
 ): Promise<void> {
   const cid = conversation.conversationId;
 
-  // Popular product button tapped — go straight to form, no browsing step
+  // Popular product button tapped — only Resume is live; others show "Coming soon"
   if (message.type === "button_reply" && message.buttonId?.startsWith("prod-")) {
     const prodId = message.buttonId;
     const product = findProduct(prodId);
+    if (prodId !== LIVE_PRODUCT_ID) {
+      await sendText(cid, phone, t("comingSoon"));
+      await sendWelcome(cid, phone);
+      return;
+    }
     if (product?.productConfigId) {
       await db.collection("conversations").doc(cid).update({
+        useCase: "resume",
         browsePath: [prodId],
+        status: "selecting_usecases",
         updatedAt: new Date(),
       });
-      await initiateFlow(phone, cid, product.productConfigId, [prodId]);
+      const { sendResumeSamplesAndList } = await import("services/conversation/resumeFilter");
+      await sendResumeSamplesAndList(cid, phone);
     } else {
       await sendWelcome(cid, phone);
     }
@@ -50,23 +58,14 @@ export async function discovery(
 
 async function sendWelcome(conversationId: string, phone: string): Promise<void> {
   const popular = popularProducts().slice(0, 3); // WhatsApp max 3 buttons
-
-  // Message 1: popular product quick-pick buttons
-  await sendButtons(conversationId, phone, t("welcome.body"),
-    popular.map((p) => ({ id: p.id, title: p.label }))
+  // Resume first, then others
+  const ordered = [...popular].sort((a, b) =>
+    a.id === LIVE_PRODUCT_ID ? -1 : b.id === LIVE_PRODUCT_ID ? 1 : 0
   );
 
-  // Message 2: full category browse list
-  await sendList(conversationId, phone, t("welcome.browseAll.body"), t("welcome.browseAll.button"), [
-    {
-      rows: catalog.map((c) => ({
-        id: c.id,
-        title: c.label,
-        description: c.description,
-      })),
-    },
-  ]);
-
+  await sendButtons(conversationId, phone, t("welcome.body"),
+    ordered.map((p) => ({ id: p.id, title: t(`welcome.button.${p.id}` as TranslationKey) }))
+  );
 }
 
 export async function initiateFlow(

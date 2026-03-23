@@ -58,13 +58,20 @@ export async function handleUseCaseSelection(
     return;
   }
 
+  const isResume = conversation.useCase === "resume";
+
   await db.collection("conversations").doc(conversation.conversationId).update({
     selectedUseCaseIds: [message.listId],
     updatedAt: new Date(),
   });
 
-  await startFulfillment(phone, {
-    ...conversation,
-    selectedUseCaseIds: [message.listId],
-  });
+  const updatedConversation = { ...conversation, selectedUseCaseIds: [message.listId] };
+
+  if (isResume) {
+    const { advanceResumeFlow } = await import("services/conversation/resumeFlowRouter");
+    await advanceResumeFlow(phone, updatedConversation);
+    return;
+  }
+
+  await startFulfillment(phone, updatedConversation);
 }

@@ -3,8 +3,9 @@
  * Optimized for Applicant Tracking Systems to parse section order and content correctly.
  */
 import {
-  PW, pageBreak, hr, parseResumeData, getPrimaryColor,
+  PW, pageBreak, hr, parseResumeData, getPrimaryColor, autoFitText,
   renderExperience, renderEducation, renderSkillsList, renderProjects,
+  renderOptionalSections, renderContactsInline,
 } from "./helpers";
 
 export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): void {
@@ -14,20 +15,18 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
   const W = PW - M * 2;
 
   // Name (plain text, no box)
-  doc.font("Inter-Bold").fontSize(20).fillColor(PRIMARY)
+  const nameSize = autoFitText(doc, d.fullName, "Inter-Bold", 20, 12, W);
+  doc.font("Inter-Bold").fontSize(nameSize).fillColor(PRIMARY)
     .text(d.fullName, M, 40, { width: W });
   doc.font("Inter").fontSize(10).fillColor("#555")
     .text(d.targetRole, M, doc.y + 2, { width: W });
 
-  const contacts = [d.email, d.phone, d.address, d.linkedin, d.website].filter(Boolean) as string[];
+  const contacts = [d.email, d.phone, d.linkedin, d.website, d.address].filter(Boolean) as string[];
   if (contacts.length) {
-    doc.font("Inter").fontSize(9).fillColor("#666")
-      .text(contacts.join("  |  "), M, doc.y + 6, { width: W });
+    renderContactsInline(doc, contacts, M, doc.y + 6, W, "Inter", 9, "#666666", "  |  ");
   }
 
-  let y = doc.y + 12;
-  hr(doc, M, y, W, PRIMARY, 0.5);
-  y += 14;
+  let y = doc.y + 6;
   doc.y = y;
 
   if (d.summary) {
@@ -84,5 +83,12 @@ export function render(doc: PDFKit.PDFDocument, data: Record<string, unknown>): 
     renderProjects(doc, d.projects, M, W,
       { title: "Inter-SemiBold", body: "Inter", bullet: "Inter" },
       { title: "#111", body: "#444", bullet: "#444" });
+    doc.y += 10;
   }
+
+  renderOptionalSections(doc, d, M, W,
+    (title) => { pageBreak(doc, 50); doc.font("Inter-SemiBold").fontSize(10).fillColor(PRIMARY).text(title.toUpperCase(), M, doc.y, { width: W }); hr(doc, M, doc.y + 2, W, PRIMARY, 0.4); doc.y += 8; },
+    { title: "Inter-SemiBold", body: "Inter", meta: "Inter-Italic", bullet: "Inter" },
+    { title: "#111", body: "#333", meta: "#666", bullet: "#444" },
+    PRIMARY);
 }

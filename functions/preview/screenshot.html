@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Whybee — All 10 resume templates</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      padding: 24px;
+    }
+    h1 {
+      text-align: center;
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      color: #0f172a;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .cell {
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .cell .preview {
+      width: 100%;
+      aspect-ratio: 210/297;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .cell canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .cell .name {
+      padding: 8px 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #334155;
+    }
+    .cell .loading {
+      padding: 20px;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <h1>All 10 resume templates</h1>
+  <div id="grid" class="grid"></div>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+    const TEMPLATES_10 = [
+      { key: "lunar",    label: "Lunar" },
+      { key: "aurora",   label: "Aurora" },
+      { key: "nebula",   label: "Nebula" },
+      { key: "cosmos",   label: "Cosmos" },
+      { key: "celestial", label: "Celestial" },
+      { key: "galaxy",   label: "Galaxy" },
+      { key: "astralis", label: "Astralis" },
+      { key: "pulsar",   label: "Pulsar" },
+      { key: "eclipse",  label: "Eclipse" },
+      { key: "comet",    label: "Comet" },
+    ];
+
+    async function renderPdfToCanvas(url, canvas, scale) {
+      const pdf = await pdfjsLib.getDocument(url).promise;
+      const page = await pdf.getPage(1);
+      const vp = page.getViewport({ scale });
+      canvas.width = vp.width;
+      canvas.height = vp.height;
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+    }
+
+    const bust = "?v=" + Date.now();
+
+    async function loadCell(t) {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      const preview = document.createElement("div");
+      preview.className = "preview";
+      const loading = document.createElement("div");
+      loading.className = "loading";
+      loading.textContent = "Loading...";
+      preview.appendChild(loading);
+      cell.appendChild(preview);
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = t.label;
+      cell.appendChild(name);
+      document.getElementById("grid").appendChild(cell);
+
+      const canvas = document.createElement("canvas");
+      try {
+        await renderPdfToCanvas(t.key + ".pdf" + bust, canvas, 0.85);
+        preview.innerHTML = "";
+        preview.appendChild(canvas);
+      } catch (e) {
+        loading.textContent = "Run preview server (npm run preview:serve) and generate PDFs (npm run preview:resumes)";
+      }
+    }
+
+    (async function() {
+      for (const t of TEMPLATES_10) {
+        await loadCell(t);
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -26,6 +26,7 @@ export const SAMPLE_DATA: ResumeData = {
   phone: "(555) 789-1234",
   address: "New York, NY 10001",
   linkedin: "linkedin.com/in/samanthawilliams",
+  github: "github.com/samwilliams",
   website: "samanthawilliams.com",
   experience: [
     {
@@ -139,6 +140,113 @@ export const SAMPLE_DATA: ResumeData = {
         "Freed 25+ hours per week of analyst time, redirected toward strategic initiatives.",
       ],
     },
+  ],
+  volunteer: [
+    {
+      role: "Data Literacy Mentor",
+      organization: "Code for America",
+      startDate: "Jan 2022",
+      endDate: "Present",
+      bullets: [
+        "Mentored 15+ junior analysts from underrepresented backgrounds in SQL, Python, and data visualization best practices.",
+        "Designed a 6-week curriculum on business analytics fundamentals adopted by 3 local community colleges.",
+      ],
+    },
+    {
+      role: "Pro Bono Analyst",
+      organization: "Habitat for Humanity NYC",
+      startDate: "Mar 2019",
+      endDate: "Dec 2021",
+      bullets: [
+        "Built donor segmentation models that increased fundraising email conversion by 22%.",
+        "Created an interactive Tableau dashboard tracking volunteer hours and project milestones across 8 NYC boroughs.",
+      ],
+    },
+  ],
+  certifications: [
+    {
+      name: "AWS Certified Data Analytics — Specialty",
+      issuer: "Amazon Web Services",
+      date: "Sep 2024",
+      url: "https://aws.amazon.com/certification/certified-data-analytics-specialty/",
+    },
+    {
+      name: "Tableau Desktop Specialist",
+      issuer: "Tableau (Salesforce)",
+      date: "Mar 2023",
+    },
+  ],
+  awards: [
+    {
+      title: "Innovation Award — Most Impactful Technology Initiative",
+      issuer: "Loom & Lantern Co.",
+      date: "2023",
+      description: "Recognized for the Enterprise KPI Dashboard Platform that transformed executive decision-making across 5 departments.",
+    },
+    {
+      title: "Rising Star in Analytics",
+      issuer: "NYC Data Council",
+      date: "2020",
+      description: "Awarded to analysts under 30 demonstrating exceptional impact in data-driven business transformation.",
+    },
+  ],
+  languages: [
+    { language: "English", proficiency: "Native" },
+    { language: "Spanish", proficiency: "Professional" },
+    { language: "French", proficiency: "Conversational" },
+  ],
+  interests: [
+    "Open-source data tools",
+    "Marathon running",
+    "Behavioral economics",
+    "Board games",
+    "Urban gardening",
+    "Podcast hosting",
+  ],
+  organizations: [
+    {
+      name: "Women in Data Science (WiDS)",
+      role: "NYC Chapter Lead",
+      startDate: "2021",
+      endDate: "Present",
+    },
+    {
+      name: "INFORMS — Institute for Operations Research",
+      role: "Member",
+      startDate: "2017",
+      endDate: "Present",
+    },
+  ],
+  achievements: [
+    {
+      title: "Published research on predictive churn modeling in Harvard Business Review Analytics Quarterly",
+      description: "Co-authored a peer-reviewed case study on applying gradient boosting to SaaS retention, cited 40+ times.",
+      url: "https://hbr.org/analytics/churn-modeling-saas",
+    },
+    {
+      title: "Speaker at Strata Data Conference 2023 — Building Real-Time KPI Dashboards at Scale",
+      url: "https://conferences.oreilly.com/strata/samantha-williams",
+    },
+  ],
+  conferences: [
+    {
+      name: "Strata Data Conference",
+      role: "Speaker",
+      date: "Oct 2023",
+      url: "https://conferences.oreilly.com/strata",
+    },
+    {
+      name: "PyData NYC",
+      role: "Panelist — MLOps for Business Analytics",
+      date: "Nov 2022",
+    },
+  ],
+  causes: [
+    "Data literacy education",
+    "Diversity in STEM",
+    "Climate data transparency",
+    "Digital privacy rights",
+    "Open data advocacy",
   ],
 };
 

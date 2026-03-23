@@ -22,6 +22,8 @@ export interface CatalogUseCase {
   description: string;
   pricing: { INR: number; USD: number };
   outputs: UseCaseOutput[];
+  /** Resume only: whether this template has a photo placeholder */
+  supportsPhoto?: boolean;
 }
 
 export interface ProductConfig {

@@ -6,6 +6,9 @@ import { birthdayProduct } from "config/products/birthday";
 import { businessProduct } from "config/products/business";
 import { CatalogCategory, CatalogProduct, CatalogUseCase } from "./types";
 
+/** Only this product is live; others show "Coming soon" */
+export const LIVE_PRODUCT_ID = "prod-student-resume";
+
 const pdf = (template: string) => (data: Record<string, unknown>) => generatePdf({ ...data, _template: template });
 
 export const catalog: CatalogCategory[] = [
@@ -177,14 +180,15 @@ export const catalog: CatalogCategory[] = [
         popular: true,
         productConfigId: "resume",
         useCases: [
-          { id: "uc-resume-astralis",  label: "Astralis",  description: "Two-column, green accent, skill badges",    pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("astralis") }] },
-          { id: "uc-resume-nebula",    label: "Nebula",    description: "Navy header with a clean light sidebar",    pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("nebula") }] },
-          { id: "uc-resume-celestial", label: "Celestial", description: "Full-height navy sidebar, white main area", pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("celestial") }] },
-          { id: "uc-resume-cosmos",    label: "Cosmos",    description: "Dark charcoal header, single-column body",  pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("cosmos") }] },
-          { id: "uc-resume-aurora",    label: "Aurora",    description: "Pink/blush gradient header, two-column",    pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("aurora") }] },
-          { id: "uc-resume-eclipse",   label: "Eclipse",   description: "Single-column, centered serif name",        pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("eclipse") }] },
-          { id: "uc-resume-solstice",  label: "Solstice",  description: "Ultra-minimal, serif, no color",            pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("solstice") }] },
-          { id: "uc-resume-ats",       label: "ATS",       description: "Single-column, ATS-optimised for job apps", pricing: { INR: 89, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("ats") }] },
+          { id: "uc-resume-mercury", label: "Mercury", description: "Great for students",      pricing: { INR: 19, USD: 1 }, outputs: [{ type: "pdf" as const, generate: pdf("mercury") }] },
+          { id: "uc-resume-saturn",  label: "Saturn",  description: "Great for professionals", pricing: { INR: 29, USD: 1 }, outputs: [{ type: "pdf" as const, generate: pdf("saturn") }] },
+          { id: "uc-resume-neptune", label: "Neptune", description: "Great for consultants",   pricing: { INR: 29, USD: 1 }, outputs: [{ type: "pdf" as const, generate: pdf("neptune") }] },
+          { id: "uc-resume-venus",   label: "Venus",   description: "Great for creatives",     pricing: { INR: 39, USD: 1 }, outputs: [{ type: "pdf" as const, generate: pdf("venus") }] },
+          { id: "uc-resume-pluto",   label: "Pluto",   description: "Great for academics",     pricing: { INR: 39, USD: 1 }, outputs: [{ type: "pdf" as const, generate: pdf("pluto") }] },
+          { id: "uc-resume-mars",    label: "Mars",    description: "Great for marketers",     pricing: { INR: 39, USD: 1 }, outputs: [{ type: "pdf" as const, generate: pdf("mars") }] },
+          { id: "uc-resume-jupiter", label: "Jupiter", description: "Great for executives",    pricing: { INR: 39, USD: 1 }, outputs: [{ type: "pdf" as const, generate: pdf("jupiter") }] },
+          { id: "uc-resume-uranus",  label: "Uranus",  description: "Great for engineers",     pricing: { INR: 39, USD: 1 }, outputs: [{ type: "pdf" as const, generate: pdf("uranus") }] },
+          { id: "uc-resume-earth",   label: "Earth",   description: "Great for everyone",      pricing: { INR: 49, USD: 2 }, outputs: [{ type: "pdf" as const, generate: pdf("earth") }] },
         ],
       },
     ],

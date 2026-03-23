@@ -29,7 +29,10 @@ Document ID is a Firestore auto-generated ID. Stored in `users/{phone}.activeCon
 | `useCase` | string \| undefined | `"birthday"` \| `"business"` \| `"event"` |
 | `collectedData` | object | User-provided form inputs and media IDs |
 | `browsePath` | string[] \| undefined | Catalog navigation trail (e.g. `["cat-memories", "prod-birthdays"]`) |
+| `selectedFilters` | object \| undefined | Resume only: `{ withPhoto: "yes" \| "no" \| "both" }` before sample list |
 | `selectedUseCaseIds` | string[] \| undefined | Use case IDs selected at the selecting_usecases step |
+| `selectedPrimaryColor` | string \| undefined | Resume only: chosen template colour (hex) |
+| `inputMethod` | string \| undefined | Resume only: `"upload"` \| `"scratch"` |
 | `paymentData` | object \| undefined | Payment metadata (see below) |
 | `lastMessageAt` | Timestamp | Updated on every incoming message (used for idle timeout) |
 | `createdAt` | Timestamp | |
@@ -55,6 +58,9 @@ Set during fulfillment when the Razorpay payment link is created.
 | `form_sent` | WhatsApp Form sent, waiting for nfm_reply submission |
 | `refining` | LLM collecting remaining fields conversationally |
 | `selecting_usecases` | User choosing what to create (use case list sent) |
+| `selecting_color` | Resume only: user choosing background or accent colour |
+| `choose_input_method` | Resume only: user choosing Upload PDF vs Build from scratch |
+| `waiting_for_pdf` | Resume only: waiting for user to send resume PDF document |
 | `confirming` | Confirmation sent, waiting for button tap |
 | `generating` | Outputs being generated |
 | `awaiting_payment` | Payment CTA sent, waiting for payment |
@@ -70,9 +76,9 @@ Every incoming message is appended here (fire-and-forget, does not block routing
 | `phone` | string | Sender's E.164 number |
 | `messageId` | string | WhatsApp message ID |
 | `timestamp` | string | WhatsApp-provided timestamp |
-| `type` | string | `text`, `image`, `button_reply`, `list_reply`, `form_reply`, etc. |
+| `type` | string | `text`, `image`, `video`, `audio`, `document`, `button_reply`, `list_reply`, `form_reply`, etc. |
 | `text` | string? | Present for text messages |
-| `mediaId` | string? | Present for image/video/audio |
+| `mediaId` | string? | Present for image/video/audio/document |
 | `buttonId` | string? | Present for button replies |
 | `listId` | string? | Present for list replies |
 | `formData` | object? | Present for form replies |
