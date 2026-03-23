@@ -1,5 +1,6 @@
 import Razorpay from "razorpay";
 import { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET } from "config/env";
+import { isOwner } from "utils/isOwner";
 
 function getClient(): Razorpay {
   return new Razorpay({
@@ -17,8 +18,10 @@ export async function createPaymentLink(
 ): Promise<{ id: string; shortUrl: string }> {
   const client = getClient();
 
+  const effectiveAmount = isOwner(phone) ? Math.max(1, Math.round(amount * 0.01)) : amount;
+
   const link = await client.paymentLink.create({
-    amount: amount * 100, // convert to smallest unit (paise / cents)
+    amount: effectiveAmount * 100, // convert to smallest unit (paise / cents)
     currency,
     description,
     customer: { contact: `+${phone}` },
