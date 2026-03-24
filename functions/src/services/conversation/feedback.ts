@@ -1,8 +1,10 @@
 import { db } from "utils/firestore";
 import { sendText } from "services/whatsapp/sendText";
+import { sendContact } from "services/whatsapp/sendContact";
 import { sendButtons } from "services/whatsapp/sendButtons";
 import { ParsedMessage } from "services/whatsapp/parseWebhookPayload";
 import { Conversation } from "services/conversation/handleIncomingMessage";
+import { WHATSAPP_PHONE_NUMBER } from "config/env";
 import { t } from "utils/t";
 
 const RATING_MAP: Record<string, string> = {
@@ -44,5 +46,12 @@ export async function handleFeedback(
     updatedAt: new Date(),
   });
 
-  await sendText(cid, phone, t("feedback.thanks"));
+  const isPositive = message.buttonId === "fb-excellent" || message.buttonId === "fb-good";
+
+  if (isPositive) {
+    await sendText(cid, phone, t("feedback.sharePrompt"));
+    await sendContact(cid, phone, t("feedback.shareContactName"), WHATSAPP_PHONE_NUMBER.value());
+  } else {
+    await sendText(cid, phone, t("feedback.thanks"));
+  }
 }

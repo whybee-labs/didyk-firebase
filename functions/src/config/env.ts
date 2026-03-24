@@ -13,3 +13,4 @@ export const RAZORPAY_KEY_SECRET = defineSecret("RAZORPAY_KEY_SECRET");
 export const RAZORPAY_WEBHOOK_SECRET = defineSecret("RAZORPAY_WEBHOOK_SECRET");
 
 export const OWNER_PHONES = defineSecret("OWNER_PHONES");
+export const WHATSAPP_PHONE_NUMBER = defineSecret("WHATSAPP_PHONE_NUMBER");

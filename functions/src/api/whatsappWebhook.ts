@@ -9,12 +9,13 @@ import {
   RAZORPAY_KEY_ID,
   RAZORPAY_KEY_SECRET,
   OWNER_PHONES,
+  WHATSAPP_PHONE_NUMBER,
 } from "config/env";
 import { parseWebhookPayload } from "services/whatsapp/parseWebhookPayload";
 import { handleIncomingMessage } from "services/conversation/handleIncomingMessage";
 
 export const whatsappWebhook = onRequest(
-  { minInstances: 1, secrets: [WHATSAPP_VERIFY_TOKEN, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, OPENAI_API_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, OWNER_PHONES] },
+  { minInstances: 1, secrets: [WHATSAPP_VERIFY_TOKEN, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, OPENAI_API_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, OWNER_PHONES, WHATSAPP_PHONE_NUMBER] },
   async (req, res) => {
     if (req.method === "GET") {
       handleVerification(req, res);

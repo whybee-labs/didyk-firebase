@@ -73,5 +73,7 @@
   "feedback.button.excellent": "🔥 Excellent!",
   "feedback.button.good": "👍🏻 Pretty good",
   "feedback.button.poor": "👎🏻 Needs work",
-  "feedback.thanks": "💛 Thank you so much — your feedback truly means the world to us. We hope to create something special for you again soon 🌟"
+  "feedback.thanks": "💛 Thank you so much — your feedback truly means the world to us. We hope to create something special for you again soon 🌟",
+  "feedback.sharePrompt": "🔥 So glad you loved it! Know someone who'd find this useful? Share our contact and help them create something amazing too 👇",
+  "feedback.shareContactName": "Whybee"
 }
