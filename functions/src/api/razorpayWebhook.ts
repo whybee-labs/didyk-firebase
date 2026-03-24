@@ -18,7 +18,7 @@ import { sendFeedbackRequest } from "services/conversation/feedback";
 import { t } from "utils/t";
 
 export const razorpayWebhook = onRequest(
-  { secrets: [RAZORPAY_WEBHOOK_SECRET, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID] },
+  { minInstances: 1, secrets: [RAZORPAY_WEBHOOK_SECRET, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID] },
   async (req, res) => {
     if (req.method !== "POST") {
       res.status(405).send("Method Not Allowed");
