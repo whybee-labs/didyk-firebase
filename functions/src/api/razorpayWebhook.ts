@@ -18,7 +18,7 @@ import { StructuredData } from "config/products/types";
 import { t } from "utils/t";
 
 export const razorpayWebhook = onRequest(
-  { minInstances: 1, secrets: [RAZORPAY_WEBHOOK_SECRET, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, OPENAI_IMAGE_API_KEY] },
+  { secrets: [RAZORPAY_WEBHOOK_SECRET, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, OPENAI_IMAGE_API_KEY] },
   async (req, res) => {
     if (req.method !== "POST") {
       res.status(405).send("Method Not Allowed");
