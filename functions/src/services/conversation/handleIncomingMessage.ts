@@ -82,6 +82,19 @@ export async function handleIncomingMessage(
     .collection("messages").add({ ...message, createdAt: now })
     .catch((err) => logger.warn("Failed to log message", { err }));
 
+  // Append incoming message to messageHistory for LLM context (skip on reset — history was just cleared)
+  if (!isReset) {
+    const userText = message.text?.trim() || (message.type === "image" ? "[image]" : null);
+    if (userText) {
+      const entry: HistoryEntry = { role: "user", content: userText, at: now.getTime() };
+      const trimmed = [...(conversation.messageHistory ?? []), entry].slice(-10);
+      conversation = { ...conversation, messageHistory: trimmed };
+      db.collection("conversations").doc(conversation.conversationId).update({
+        messageHistory: trimmed,
+      }).catch((err) => logger.warn("Failed to append user message to messageHistory", { err }));
+    }
+  }
+
   switch (conversation.status) {
     case "intake":
       await handleIntake(phone, message, conversation);

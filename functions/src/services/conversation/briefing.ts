@@ -12,8 +12,6 @@ import { handlePlanning } from "services/conversation/planning";
 import { startFulfillment } from "services/conversation/fulfillment";
 import { t } from "utils/t";
 
-const MAX_HISTORY_PAIRS = 12;
-
 export async function handleBriefing(
   phone: string,
   message: ParsedMessage,
@@ -21,7 +19,8 @@ export async function handleBriefing(
 ): Promise<void> {
   const cid = conversation.conversationId;
   let unstructuredData = { ...conversation.unstructuredData };
-  let history = conversation.messageHistory ?? [];
+  // Last 5 pairs — logOutbound and handleIncomingMessage keep messageHistory updated
+  const history = (conversation.messageHistory ?? []).slice(-10);
 
   // If there's a pending question, map the user's reply to unstructuredData
   if (conversation.pendingQuestion) {
@@ -44,27 +43,12 @@ export async function handleBriefing(
 
     if (answer !== null) {
       unstructuredData[key] = answer;
-      history = trimHistory([
-        ...history,
-        { role: "user" as const, content: String(answer) },
-      ]);
       await db.collection("conversations").doc(cid).update({
         [`unstructuredData.${key}`]: answer,
         pendingQuestion: null,
-        messageHistory: history,
         updatedAt: new Date(),
       });
     }
-  } else if (message.type === "text" && message.text?.trim()) {
-    // Free-text message during briefing — add to history
-    history = trimHistory([
-      ...history,
-      { role: "user" as const, content: message.text.trim() },
-    ]);
-    await db.collection("conversations").doc(cid).update({
-      messageHistory: history,
-      updatedAt: new Date(),
-    });
   }
 
   // User approved the enriched prompt
@@ -92,7 +76,6 @@ export async function handleBriefing(
   );
 
   if (result.ready) {
-    // Show enriched prompt and ask user to confirm
     const preview = t("briefing.readyPrompt", { enrichedPrompt: result.enrichedPrompt });
     await sendButtons(cid, phone, preview, [
       { id: "brief_approved", title: t("briefing.readyYes") },
@@ -168,7 +151,6 @@ Respond ONLY with JSON in one of these formats:
     return JSON.parse(raw);
   } catch (err) {
     logger.warn("Briefing LLM failed", { err, raw: raw.slice(0, 300) });
-    // Fallback: ask a generic text question
     return {
       ready: false,
       question: { key: "additionalContext", type: "text", text: "Tell me more about what you have in mind." },
@@ -178,7 +160,6 @@ Respond ONLY with JSON in one of these formats:
 
 async function transitionFromBriefing(cid: string, phone: string, conversation: Conversation): Promise<void> {
   const outputType = conversation.structuredData.outputType;
-  // Video gets a planning step; image/audio go straight to generation
   const nextStatus = outputType === "video" ? "planning" : "generating";
 
   await db.collection("conversations").doc(cid).update({
@@ -194,8 +175,4 @@ async function transitionFromBriefing(cid: string, phone: string, conversation: 
   } else {
     await startFulfillment(phone, { ...conversation, status: "generating" });
   }
-}
-
-function trimHistory(history: HistoryEntry[]): HistoryEntry[] {
-  return history.slice(-(MAX_HISTORY_PAIRS * 2));
 }

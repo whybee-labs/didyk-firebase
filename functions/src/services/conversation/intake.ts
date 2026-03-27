@@ -93,19 +93,15 @@ export async function handleIntake(
   // Step 2: Have output type but no intent yet — classify from first message
   if (!conversation.intentId && message.type === "text" && message.text?.trim()) {
     const intentId = await classifyIntent(message.text, sd.outputType);
-    // Save the initial description so the briefing LLM has context
-    const initialEntry = { role: "user" as const, content: message.text.trim() };
     await db.collection("conversations").doc(cid).update({
       intentId,
       "unstructuredData._initialDescription": message.text.trim(),
-      messageHistory: [initialEntry],
       updatedAt: new Date(),
     });
     conversation = {
       ...conversation,
       intentId,
       unstructuredData: { ...conversation.unstructuredData, _initialDescription: message.text.trim() },
-      messageHistory: [initialEntry],
     };
     // Fall through to structured param collection
   }

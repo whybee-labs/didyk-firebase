@@ -15,6 +15,7 @@ export type ConversationStatus =
 export interface HistoryEntry {
   role: "user" | "assistant";
   content: string;
+  at: number; // ms timestamp — ensures arrayUnion treats each turn as unique
 }
 
 export interface Conversation {
