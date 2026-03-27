@@ -1,7 +1,12 @@
-// TODO: replace with real image generation service
-const PLACEHOLDER_IMAGE_URL = "https://placehold.co/1280x720.jpg";
+import { StructuredData } from "config/products/types";
 
-export async function generateImage(data: Record<string, unknown>): Promise<string> {
-  void data; // will be used by real implementation
+// TODO: replace with real image generation API (Fal.ai / Stability)
+const PLACEHOLDER_IMAGE_URL = "https://placehold.co/1080x1080.jpg";
+
+export async function generateImage(data: {
+  structuredData: StructuredData;
+  enrichedPrompt: string;
+}): Promise<string> {
+  void data;
   return PLACEHOLDER_IMAGE_URL;
 }

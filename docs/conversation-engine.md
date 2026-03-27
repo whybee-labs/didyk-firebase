@@ -1,123 +1,59 @@
 # Conversation Engine
 
-The conversation engine is the core of the backend. Every incoming WhatsApp message is routed through it.
+The conversation engine is the core of the backend. Every incoming WhatsApp message is routed through `handleIncomingMessage.ts`.
 
 ---
 
-## Conversation Model
-
-Each user has one active conversation at a time. Users and conversations are one-to-many.
-
-**`users/{phone}`**
-```
-phone                string   — E.164 format, also the document ID
-activeConversationId string | null
-totalConversations   number
-firstSeenAt          Timestamp
-lastSeenAt           Timestamp
-```
-
-**`conversations/{conversationId}`** — Firestore auto-generated ID (not stored as a field)
-```
-phone                string
-status               ConversationStatus
-useCase              "birthday" | "business" | "event" | "resume" | undefined
-collectedData        Record<string, unknown>   — user-provided form inputs + media IDs
-browsePath           string[]                  — navigation trail (e.g. ["cat-memories", "prod-birthdays"])
-selectedFilters      { withPhoto?: "yes"|"no"|"both" } — resume only: filter before sample list
-selectedUseCaseIds   string[]                  — use case IDs chosen at selecting_usecases step
-selectedPrimaryColor string                    — resume: chosen colour (hex) for template
-inputMethod         "upload" | "scratch"       — resume: upload PDF vs build from scratch
-dataConfirmed        boolean                   — resume: true when user typed "done" in reviewing_resume; gate for preview generation
-paymentData          { linkId, amount, createdAt, paidAt? } — set during fulfillment
-lastMessageAt        Timestamp  — updated on every incoming message (used for idle timeout)
-createdAt            Timestamp
-updatedAt            Timestamp
-```
-
-**`conversations/{conversationId}/messages/{messageId}`** — subcollection, appended on every message (fire-and-forget)
-
----
-
-## Status State Machine
+## State Machine
 
 ```
-            ┌──────────────┐
-  new user  │   discovery  │  ← welcome: popular buttons + browse list (only Resume is live; others "Coming soon")
-            └──────┬───────┘
-                   │ popular product or category selected from list
-            ┌──────▼───────┐
-            │   browsing   │  ← navigating catalog: category → product (only Resume continues)
-            └──────┬───────┘
-                   │ Resume selected → sample image + template list (no filter step)
-            ┌──────▼────────────┐
-            │ selecting_usecases│  ← resume: pick one of 9 templates; others: "What would you like created?"
-            └──────┬────────────┘
-                   │ use case selected → advanceResumeFlow()
-            ┌──────▼────────────┐
-            │ selecting_color  │  ← resume only: bg-mode (background options) or text-mode (accent options) list
-            └──────┬────────────┘
-                   │ colour chosen → advanceResumeFlow()
-            ┌──────▼────────────────┐
-            │ choose_input_method   │  ← resume only: [Upload your PDF] [Build from scratch] buttons
-            └──────┬────────────────┘
-                   │ "Build from scratch" → refining; "Upload your PDF" → waiting_for_pdf
-            ┌──────▼──────────────┐
-            │ waiting_for_pdf     │  ← resume only: user sends document; we parse (pdf-parse + LLM), prefill
-            └──────┬──────────────┘
-                   │ PDF parsed → advanceResumeFlow()
-            ┌──────▼───────┐
-            │   refining   │  ← LLM collecting fields / edits (resume: name+role required)
-            └──────┬───────┘
-                   │ required fields complete → advanceResumeFlow()
-            ┌──────▼──────────────┐
-            │ reviewing_resume    │  ← show section review messages; user edits until typing "done"
-            └──────┬──────────────┘
-                   │ user types "done" → sets dataConfirmed=true → advanceResumeFlow()
-            ┌──────▼───────┐
-            │  generating  │  ← brief state during output generation
-            └──────┬───────┘
-                   │ preview PDF sent (4s delay)
-            ┌──────▼──────────────┐
-            │ reviewing_preview   │  ← resume only: 3 buttons [📄 Get Final Resume] [🎨 Change Template] [✏️ Edit Details]
-            └──────┬──────────────┘
-                   │ "Get Final Resume" → payment link created
-                   │ "Change Template" → clears template+color → advanceResumeFlow() (skips filled steps)
-                   │ "Edit Details" → sets dataConfirmed=false → advanceResumeFlow() → reviewing_resume
-            ┌──────▼──────────┐
-            │ awaiting_payment │  ← CTA button sent, waiting for Razorpay payment
-            └──────┬──────────┘
-                   │ payment_link.paid webhook received
-            ┌──────▼───────┐
-            │  completed   │
-            └──────────────┘
-
-"Start Over" at confirming → resets the same conversation doc back to discovery
-(status, useCase, collectedData, browsePath, selectedUseCaseIds cleared — no new document created)
-
-"hi" at any status → same reset (clears all fields including dataConfirmed, sends welcome again)
+                ┌──────────────┐
+  new user      │    intake    │  ← welcome: Image / Video / Audio buttons
+                └──────┬───────┘
+                       │ output type chosen → discovery message + describe prompt
+                       │ user sends description → classify intent → collect structured params
+                       │ ref images? → uploading | no → briefing
+                ┌──────▼───────┐
+                │   uploading  │  ← user sends reference images → stored in Firebase Storage
+                └──────┬───────┘
+                       │ user taps "Done" → briefing
+                ┌──────▼───────┐
+                │   briefing   │  ← LLM question loop: list / boolean / text questions
+                └──────┬───────┘
+                       │ ready:true → send enrichedPrompt → user confirms or pushes back
+                       │ image/audio: → generating
+                       │ video: → planning
+                ┌──────▼───────┐
+                │   planning   │  ← (video only) LLM generates scene plan, user reviews
+                └──────┬───────┘
+                       │ approved → confirming
+                ┌──────▼───────┐
+                │  confirming  │  ← (video only) full summary, user taps Confirm
+                └──────┬───────┘
+                       │ confirmed → generating
+                ┌──────▼───────┐
+                │  generating  │  ← outputs being generated (brief, async for video)
+                └──────┬───────┘
+                       │ preview sent + payment CTA sent
+                ┌──────▼──────────┐
+                │ awaiting_payment │  ← waiting for Razorpay webhook
+                └──────┬──────────┘
+                       │ payment_link.paid webhook
+                ┌──────▼───────┐
+                │  delivering  │  ← send final high-quality output to user
+                └──────┬───────┘
+                       │
+                ┌──────▼───────┐
+                │   feedback   │  ← star rating prompt
+                └──────┬───────┘
+                       │
+                ┌──────▼───────┐
+                │  completed   │
+                └──────────────┘
 ```
 
-### Resume Flow Router (`advanceResumeFlow`)
-
-All resume state transitions go through `services/conversation/resumeFlowRouter.ts`.
-It checks prerequisites in order and routes to the next unfilled step:
-
-| # | Field | Missing → Status |
-|---|-------|------------------|
-| 1 | `selectedUseCaseIds` | `selecting_usecases` |
-| 2 | `selectedPrimaryColor` | `selecting_color` |
-| 3 | `inputMethod` | `choose_input_method` |
-| 4 | Required data (firstName, lastName, targetRole) | `waiting_for_pdf` or `refining` |
-| 5 | `dataConfirmed` | `reviewing_resume` |
-
-All filled → `startFulfillment()` → generate preview.
-
-This means "Change Template" from preview skips input method and data collection
-(they're already filled), going straight to preview after template + colour are re-selected.
-
-Note: `confirming` is used for non-resume products only. Resume uses `reviewing_resume` + `dataConfirmed` instead.
-Note: `form_sent` is a legacy status for WhatsApp Form (nfm_reply) submissions. Not triggered by the current catalog flow.
+"hi" / "reset" / "start over" → resets conversation to `intake` from any state.
+New conversation created when: status is `completed`, idle > 8 hours, or no active conversation.
 
 ---
 
@@ -125,147 +61,121 @@ Note: `form_sent` is a legacy status for WhatsApp Form (nfm_reply) submissions. 
 
 `handleIncomingMessage.ts` is the entry point for every message.
 
-1. **"hi" shortcut** — if the message text is exactly `"hi"`, reset the conversation to `discovery` regardless of current status (clears `useCase`, `collectedData`, `browsePath`, `selectedUseCaseIds`, `selectedPrimaryColor`, `inputMethod`, `messageHistory`)
-2. **Load conversation** — look up `users/{phone}` → get `activeConversationId` → load `conversations/{activeConversationId}`
-3. **Create if needed** — create a new conversation (status `"discovery"`) if:
-   - no `activeConversationId` on the user, or
-   - conversation doesn't exist, or
-   - `status === "completed"`, or
-   - `lastMessageAt` is more than 8 hours ago
+1. **Load or create conversation** — `getOrCreateConversation(phone)`:
+   - Look up `users/{phone}` → get `activeConversationId`
+   - Load `conversations/{id}` — resume if status ≠ `completed` and not idle >8h
+   - Otherwise create a new conversation doc + update user's `activeConversationId`
+
+2. **Voice notes** — rejected immediately with an error message (not supported)
+
+3. **Reset shortcut** — if text is `"hi"`, `"reset"`, `"start over"`, or `"restart"`:
+   - Update doc: `status: "intake"`, clear `intentId`, `structuredData`, `unstructuredData`, `pendingQuestion`, `messageHistory`
+
 4. **Update timestamps** — `lastSeenAt` on user + `lastMessageAt` on conversation (parallel)
+
 5. **Log message** — append to `conversations/{id}/messages/` subcollection (fire-and-forget)
-6. **Route by status**
+
+6. **Route by status**:
 
 ```ts
 switch (conversation.status) {
-  case "discovery":             → discovery()
-  case "browsing":              → browsing()
-  case "form_sent":             → handleFormReply()
-  case "refining":              → flowEngine()
-  case "selecting_usecases":    → handleUseCaseSelection()
-  case "selecting_color":       → handleColorSelection() / sendResumeColorOptions()  // resume: colour list
-  case "choose_input_method":   → handleInputMethodSelection() / sendInputMethodPrompt()  // resume: Upload vs Scratch
-  case "waiting_for_pdf":       → handleResumePdfUpload() on document; else nudge  // resume: parse PDF, prefill
-  case "confirming":            → handleConfirmation()
-  case "reviewing_resume":       → edit via chat; "done" → regenerate preview (if template selected) or confirm
-  case "generating":            → "Still working on it, hang tight!"
-  case "reviewing_preview":     → 3 buttons: generate_final / change_template / edit_details; text → edit flow
-  case "awaiting_payment":      → "Please complete your payment using the link sent above."
-  default:                      → discovery()
+  case "intake":           → handleIntake()
+  case "uploading":        → handleUploading()
+  case "briefing":         → handleBriefing()
+  case "planning":         → handlePlanning()
+  case "confirming":       → handleConfirmation()
+  case "generating":       → "Still working on it, hang tight!"
+  case "awaiting_payment": → "Complete your payment using the link above."
+  case "feedback":         → handleFeedback()
+  default:                 → handleIntake()   // completed or unknown → restart
 }
 ```
 
 ---
 
-## Phase 1 — Discovery
+## Phase 1 — Intake
 
-**File:** `services/conversation/discovery.ts`
+**File:** `services/conversation/intake.ts`
 
-Triggered when `status === "discovery"`. Sends two messages on any non-actionable input.
+Triggered when `status === "intake"`. Collects the output type and structured parameters.
 
-**Popular product button tapped (`button_reply`, id starts with `prod-`)**
-- Looks up the product in the catalog
-- Sets `browsePath: [prodId]`, calls `initiateFlow()` → moves to `refining`
+**First message (no outputType yet):**
+- Sends welcome with 3 buttons: 🎨 Image / 🎬 Video / 🎵 Audio
+- `button_reply` → stores `structuredData.outputType`, sends dynamic discovery message (built from intents), asks for description
 
-**Category list item selected (`list_reply`, id starts with `cat-`)**
-- Sets `status: "browsing"`, `browsePath: [catId]`
-- Delegates to `browsing()`
+**After outputType set, awaiting description (text message):**
+- Calls LLM to classify intent → stores `intentId` + `unstructuredData._initialDescription`
+- Calls `promptNextParam()` to collect structured params (platform, style, genre, mood) as button sequences
+- Once all params collected → checks `intent.supportsReferenceImages`
+  - Yes → sends reference images prompt, sets `status: "uploading"`
+  - No → sets `status: "briefing"`, calls `handleBriefing()`
 
-**Anything else** → sends welcome (two messages):
-1. **Popular products** — 3 quick-reply buttons (🎂 Birthdays, 🛍️ Business Promos, 🎉 Events)
-2. **Browse list** — all 5 categories as a WhatsApp list message (Memories, Invitations, Business, Social Media, Documents)
-
----
-
-## Phase 2 — Browsing
-
-**File:** `services/conversation/browsing.ts`
-
-Triggered when `status === "browsing"`. Handles catalog navigation.
-
-**Navigation rules:**
-- `list_reply` with a `prod-*` id → look up product, call `initiateFlow()` → moves to `refining`
-- `list_reply` with a `cat-*` id → update `browsePath: [catId]`, send product list for that category
-- Any other message → re-render current level
-
-**`sendCurrentLevel(cid, phone, browsePath)`** — re-renders the catalog level based on the last element of `browsePath`:
-- Ends with `cat-*` → send product list for that category
-- Ends with `prod-*` → send use case list for that product
-- Empty / unknown → fall back to top-level category list
-
-Firestore is updated on every navigation step: `{ status: "browsing", browsePath: [...] }`.
+**Structured params collected in order:**
+- Image: platform → style
+- Video: platform → style → duration
+- Audio: genre → mood
 
 ---
 
-## Phase 3 — Refining (Field Collection)
+## Phase 2 — Uploading
 
-**File:** `services/conversation/flowEngine.ts`
+**File:** `services/conversation/uploading.ts`
 
-Triggered when `status === "refining"`. Called after product selection and on every subsequent message.
+Triggered when `status === "uploading"`. Collects reference images.
 
-**First entry** (empty `messageHistory`):
-- Sends `config.openingPrompt` — a single open invitation defined per product (e.g. *"Tell me about the birthday! Who's it for and what message would you like?"*)
-- Saves the prompt to `messageHistory` as the first assistant turn
-
-**Image messages** — handled directly:
-- `mediaId` is appended to `collectedData.images` (or the relevant media field)
-- Saved to Firestore immediately; progress feedback sent to user
-- Re-runs the completion check
-
-**LLM:** Uses Google Gemini (`gemini-2.0-flash`) via OpenAI-compatible API. Requires `GEMINI_API_KEY` Firebase secret.
-
-**Text messages** — LLM extracts fields:
-- **User journey:** Sends status, product, selected template (name + description), input method, browse path, conversation turn count
-- **Resume:** Sends schema + full `collectedData` JSON + indexed view (Experience 0, Bullet 0, etc.) for targeted edits
-- **Initial collection** (empty/minimal data): extract what user provides
-- **Edit mode** (substantial data): default to no change — only output when user explicitly asks to change/add/remove/update
-- **Anti-hallucination:** LLM treats `collectedData` as source of truth; never invents companies, roles, bullets
-- **Partial edits:** "Remove bullet with lorem ipsum" → remove only that bullet; "change first bullet at Google" → change only that one; copy all others verbatim
-- LLM returns `{ extractedFields }` — saves to Firestore
-- If all required fields complete → calls `sendUseCaseSelection()`
-- Otherwise → sends follow-up asking for remaining missing fields
-
-**Follow-up logic (`buildFollowUpQuestion`):**
-1. If text fields still missing → ask for all of them in one message
-2. Else if required media not yet uploaded → prompt for photos
-3. Else → null (shouldn't happen if `isComplete` is correct)
-
-**Completion rule:**
-All required fields filled AND any required media fields have ≥ 1 item in their array.
+- Image messages: download from Meta, upload to Firebase Storage → append URL to `structuredData.referenceImageUrls`
+- "Done" button or `button_reply` with `id === "no_images"` → set `status: "briefing"`, call `handleBriefing()`
+- Text messages → nudge to send images or tap Done
 
 ---
 
-## Phase 4 — Use Case Selection
+## Phase 3 — Briefing
 
-**File:** `services/conversation/useCaseSelection.ts`
+**File:** `services/conversation/briefing.ts`
 
-Triggered when refining completes. Sends a list of available use cases for the product.
+Triggered when `status === "briefing"`. LLM-driven question loop.
 
-**`sendUseCaseSelection(phone, conversation)`**:
-- Resolves the catalog product from `browsePath` (last `prod-*` element)
-- Sends use case list: "Great! Now choose what you'd like created for your {productName}"
-- Sets `status: "selecting_usecases"`
+**On entry (no `pendingQuestion`):**
+- Calls LLM with `structuredData` + `unstructuredData` + intent config
+- LLM returns `{ ready: false, question: { key, type, text, options? } }` or `{ ready: true, enrichedPrompt }`
 
-**`handleUseCaseSelection(phone, message, conversation)`**:
-- `list_reply` → validate use case exists, store `selectedUseCaseIds: [id]`, move to `confirming`, call `sendConfirmation()`
-- Other → resend use case list
+**If `ready: false`:**
+- Render question as WhatsApp component (list → sendList, boolean → sendButtons, text → sendText)
+- Store `pendingQuestion: { key, type }` on conversation doc
+
+**On user reply (pendingQuestion exists):**
+- Map reply to `unstructuredData[pendingQuestion.key]`, clear `pendingQuestion`
+- Call LLM again
+
+**If `ready: true`:**
+- Send `enrichedPrompt` to user + "Does this look right?" (Yes / Add more detail buttons)
+- Yes → `transitionFromBriefing()`: image/audio → `generating` + `startFulfillment()`; video → `planning` + `handlePlanning()`
+- No / text → feed reply back into briefing loop, continue
 
 ---
 
-## Phase 5 — Confirmation
+## Phase 4 — Planning (Video Only)
+
+**File:** `services/conversation/planning.ts`
+
+Triggered when `status === "planning"`. LLM generates a scene plan.
+
+- On entry: LLM produces scene descriptions, music direction, colour palette
+- Sent to user as a text summary + Approve / Revise buttons
+- Approve → set `status: "confirming"`, call `sendConfirmation()`
+- Revise or text → feed feedback back into planning loop
+
+---
+
+## Phase 5 — Confirming (Video Only)
 
 **File:** `services/conversation/confirmation.ts`
 
-**`sendConfirmation(phone, conversation)`**
-- Gets product config → calls `config.confirmationTemplate(collectedData)` to build summary
-- Sets `status: "confirming"`
-- Sends summary text + 2 buttons:
-  - `✅ Create it!` (id: `"create"`)
-  - `🔄 Start Over` (id: `"restart"`)
+Triggered when `status === "confirming"`. Final review before generation.
 
-**`handleConfirmation(phone, message, conversation)`**
-- `"create"` → calls `startFulfillment()`
-- `"restart"` → resets the same conversation doc in-place: clears `useCase`, `collectedData`, `browsePath`, `selectedUseCaseIds`, sets `status: "discovery"`, calls `discovery()` on the same conversation
+- Shows full brief summary + Confirm / Edit buttons
+- Confirm → set `status: "generating"`, call `startFulfillment()`
+- Edit → set `status: "briefing"`, call `handleBriefing()` to re-enter the loop
 
 ---
 
@@ -273,31 +183,38 @@ Triggered when refining completes. Sends a list of available use cases for the p
 
 **File:** `services/conversation/fulfillment.ts`
 
-See [media-generation.md](./media-generation.md) for how outputs are generated and [payment.md](./payment.md) for the payment flow.
+Called by briefing (image/audio) or confirmation (video).
 
-1. Sets `status: "generating"`
-2. Sends preview message
-3. Iterates `conversation.selectedUseCaseIds`, looks up each `CatalogUseCase` via `findUseCase(id)`, generates and sends all outputs
+1. Set `status: "generating"`
+2. Call generator (`generateImage` / `generateVideo` / `generateAudio`) with `structuredData` + `enrichedPrompt`
+3. Send preview label + dispatch output (sendImage / sendVideo / sendAudio)
+4. Create Razorpay payment link → set `status: "awaiting_payment"` + store `paymentData`
+5. Send CTA button (sendCTAButton) with payment URL
 
-**Non-resume products:**
-4. Creates Razorpay payment link → CTA button → `status: "awaiting_payment"`
+On error → send error message, set `status: "briefing"`.
 
-**Resume:**
-4. Sends 3-button prompt: `Get Final Resume` / `Change Template` / `Edit Details`
-5. Sets `status: "reviewing_preview"`
-
-**`reviewing_preview` handlers:**
-- `generate_final` → creates payment link, sends CTA → `status: "awaiting_payment"`
-- `change_template` → clears `selectedUseCaseIds`/`selectedPrimaryColor`, sends template list → `status: "selecting_usecases"`
-- `edit_details` → sends section review messages → `status: "reviewing_resume"`
-- Text message → treated as edit intent, processes via flowEngine, then sends updated section review
+**Prices (INR):** image ₹99 · audio ₹149 · video ₹299
 
 ---
 
-## Start Over
+## Phase 7 — Payment & Delivery
 
-"Start Over" button in confirmation resets the **same conversation document** without creating a new one:
-1. Update doc: `status: "discovery"`, clear `useCase`, `collectedData`, `browsePath`, `selectedUseCaseIds`
-2. Call `discovery()` on the reset conversation (sends welcome messages)
+Payment is handled by the Razorpay webhook (`api/razorpayWebhook.ts`).
 
-Sending `"hi"` performs the same reset from any state.
+On `payment_link.paid`:
+1. Look up conversation by `paymentData.linkId`
+2. Set `status: "delivering"`, store `paymentData.paidAt`
+3. Generate final output (no watermark), send to user
+4. Set `status: "feedback"`, send rating prompt
+
+---
+
+## Phase 8 — Feedback
+
+**File:** `services/conversation/feedback.ts`
+
+Triggered when `status === "feedback"`. Collects a star rating.
+
+- On entry: sends rating buttons (⭐ to ⭐⭐⭐⭐⭐)
+- `button_reply` → store `feedbackData.rating`, set `status: "completed"`
+- If rating is positive → send contact / share prompt

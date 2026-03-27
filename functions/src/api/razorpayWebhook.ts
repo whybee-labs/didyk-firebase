@@ -8,13 +8,9 @@ import {
 } from "config/env";
 import { db } from "utils/firestore";
 import { sendText } from "services/whatsapp/sendText";
-import { sendVideo } from "services/whatsapp/sendVideo";
-import { sendImage } from "services/whatsapp/sendImage";
-import { sendDocument } from "services/whatsapp/sendDocument";
-import { sendAudio } from "services/whatsapp/sendAudio";
-import { findUseCase } from "config/catalog";
-import { OutputType } from "config/products/types";
+import { dispatchOutput } from "services/conversation/fulfillment";
 import { sendFeedbackRequest } from "services/conversation/feedback";
+import { StructuredData } from "config/products/types";
 import { t } from "utils/t";
 
 export const razorpayWebhook = onRequest(
@@ -52,8 +48,6 @@ export const razorpayWebhook = onRequest(
       }
     }
 
-    // Respond after work completes — Cloud Run drops sockets after res.send(),
-    // which causes ECONNRESET on Storage uploads if we respond first.
     res.status(200).send("OK");
   }
 );
@@ -79,64 +73,44 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
 
   const convSnap = convQuery.docs[0];
   const conversationId = convSnap.id;
-
   const convData = convSnap.data();
 
-  // Idempotency: skip if already processed
   if (convData?.paymentData?.paidAt) {
     logger.info("Payment already processed, skipping", { conversationId });
     return;
   }
 
   const phone = convData?.phone as string;
-  const useCase = convData?.useCase as string | undefined;
+  const structuredData = (convData?.structuredData ?? {}) as StructuredData;
+  const unstructuredData = (convData?.unstructuredData ?? {}) as Record<string, unknown>;
+  const enrichedPrompt = String(unstructuredData._enrichedPrompt ?? "");
+  const outputType = structuredData.outputType;
 
   await sendText(conversationId, phone, t("fulfillment.delivering"));
 
-  let outputsDispatched = 0;
-
-  if (useCase === "resume") {
-    // Same function as preview — only _watermark differs
-    try {
-      const { generateAndSendResume } = await import("services/conversation/fulfillment");
-      outputsDispatched = await generateAndSendResume(
-        phone,
-        conversationId,
-        (convData?.collectedData ?? {}) as Record<string, unknown>,
-        (convData?.selectedUseCaseIds ?? []) as string[],
-        convData?.selectedPrimaryColor as string | undefined,
-        false,
-      );
-    } catch (err) {
-      logger.error("Resume final generation failed", { conversationId, err });
-      await sendText(conversationId, phone, t("errors.outputFailed")).catch(() => undefined);
-    }
-  } else {
-    const selectedUseCaseIds: string[] = convData?.selectedUseCaseIds ?? [];
-    const collectedData: Record<string, unknown> = { ...(convData?.collectedData ?? {}) };
-    for (const ucId of selectedUseCaseIds) {
-      const uc = findUseCase(ucId);
-      if (!uc?.outputs) continue;
-      for (const output of uc.outputs) {
-        try {
-          const result = await output.generate({
-            ...collectedData,
-            _watermark: false,
-            _phone: phone,
-            _conversationId: conversationId,
-          });
-          await dispatchOutput(conversationId, phone, output.type, result);
-          outputsDispatched++;
-        } catch (err) {
-          logger.error("Output generation failed", { ucId, type: output.type, err });
-          await sendText(conversationId, phone, t("errors.outputFailed")).catch(() => undefined);
-        }
-      }
-    }
+  if (!outputType) {
+    logger.error("No outputType on conversation, cannot dispatch final output", { conversationId });
+    await sendText(conversationId, phone, t("errors.outputFailed"));
+    return;
   }
 
-  if (outputsDispatched === 0) {
-    logger.error("No outputs dispatched after payment", { conversationId });
+  try {
+    let url: string;
+
+    if (outputType === "image") {
+      const { generateImage } = await import("services/generators/imageGenerator");
+      url = await generateImage({ structuredData, enrichedPrompt });
+    } else if (outputType === "video") {
+      const { generateVideo } = await import("services/generators/videoGenerator");
+      url = await generateVideo({ structuredData, enrichedPrompt, unstructuredData });
+    } else {
+      const { generateAudio } = await import("services/generators/audioGenerator");
+      url = await generateAudio({ structuredData, enrichedPrompt });
+    }
+
+    await dispatchOutput(conversationId, phone, outputType, url);
+  } catch (err) {
+    logger.error("Final output generation failed", { conversationId, err });
     await sendText(conversationId, phone, t("errors.outputFailed")).catch(() => undefined);
   }
 
@@ -145,27 +119,8 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
     updatedAt: new Date(),
   });
 
-  // Delay so WhatsApp finishes delivering the file before the feedback prompt appears
   await new Promise((resolve) => setTimeout(resolve, 4000));
-
-  // Ask for feedback — this also sets status to "awaiting_feedback"
   await sendFeedbackRequest(conversationId, phone);
 
-  logger.info("Payment confirmed, outputs dispatched", { conversationId, phone, outputsDispatched });
-}
-
-async function dispatchOutput(
-  conversationId: string,
-  phone: string,
-  type: OutputType,
-  value: string,
-  pdfFilename?: string
-): Promise<void> {
-  switch (type) {
-    case "video":  return sendVideo(conversationId, phone, value);
-    case "image":  return sendImage(conversationId, phone, value);
-    case "pdf":    return sendDocument(conversationId, phone, value, pdfFilename ?? "whybee.pdf");
-    case "audio":  return sendAudio(conversationId, phone, value);
-    case "text":   return sendText(conversationId, phone, value);
-  }
+  logger.info("Payment confirmed, final output dispatched", { conversationId, phone });
 }

@@ -1,33 +1,39 @@
 import { db } from "utils/firestore";
 import { sendButtons } from "services/whatsapp/sendButtons";
 import { sendText } from "services/whatsapp/sendText";
-import { getProductConfig, UseCase } from "config/products";
 import { t } from "utils/t";
-import { Conversation } from "./handleIncomingMessage";
+import { Conversation } from "types/conversation";
+import { handleBriefing } from "services/conversation/briefing";
 import { startFulfillment } from "./fulfillment";
-import { flowEngine } from "./flowEngine";
 import { ParsedMessage } from "services/whatsapp/parseWebhookPayload";
 
 export async function sendConfirmation(phone: string, conversation: Conversation): Promise<void> {
-  const config = getProductConfig(conversation.useCase as UseCase);
-  let summary = config.confirmationTemplate(conversation.collectedData);
+  const cid = conversation.conversationId;
+  const sd = conversation.structuredData;
+  const ud = conversation.unstructuredData;
 
-  if (conversation.useCase === "resume") {
-    const missing = config.fields
-      .filter((f) => !f.required && f.key !== "primaryColor" && !conversation.collectedData[f.key])
-      .map((f) => f.label);
-    if (missing.length > 0) {
-      summary += t("resume.confirm.missingOptional", { list: missing.join(", ") });
-    }
+  const lines: string[] = ["📋 *Here's a summary of your request:*", ""];
+
+  if (sd.outputType) lines.push(`*Type:* ${sd.outputType}`);
+  if (sd.platform)   lines.push(`*Platform:* ${sd.platform}`);
+  if (sd.style)      lines.push(`*Style:* ${sd.style}`);
+  if (sd.duration)   lines.push(`*Duration:* ${sd.duration}s`);
+  if (sd.genre)      lines.push(`*Genre:* ${sd.genre}`);
+  if (sd.mood)       lines.push(`*Mood:* ${sd.mood}`);
+  if (sd.referenceImageUrls.length > 0)
+    lines.push(`*Reference images:* ${sd.referenceImageUrls.length}`);
+
+  if (ud._enrichedPrompt) {
+    lines.push("", `*Brief:* ${String(ud._enrichedPrompt)}`);
   }
 
-  await db.collection("conversations").doc(conversation.conversationId).update({
+  await db.collection("conversations").doc(cid).update({
     status: "confirming",
     updatedAt: new Date(),
   });
 
-  await sendText(conversation.conversationId, phone, summary);
-  await sendButtons(conversation.conversationId, phone, t("confirm.prompt"), [
+  await sendText(cid, phone, lines.join("\n"));
+  await sendButtons(cid, phone, t("confirm.prompt"), [
     { id: "create", title: t("confirm.createButton") },
     { id: "edit",   title: t("confirm.editButton") },
   ]);
@@ -38,30 +44,32 @@ export async function handleConfirmation(
   message: ParsedMessage,
   conversation: Conversation
 ): Promise<void> {
+  const cid = conversation.conversationId;
+
   if (message.type === "button_reply") {
     if (message.buttonId === "create") {
       await startFulfillment(phone, conversation);
       return;
     }
     if (message.buttonId === "edit") {
-      await db.collection("conversations").doc(conversation.conversationId).update({
-        status: "refining",
+      await db.collection("conversations").doc(cid).update({
+        status: "briefing",
         updatedAt: new Date(),
       });
-      await sendText(conversation.conversationId, phone, t("confirm.editPrompt"));
+      await sendText(cid, phone, t("confirm.editPrompt"));
       return;
     }
   }
 
-  // Text message = user is sending an edit (e.g. "replace summary with X")
+  // Text = user wants to change something → back to briefing
   if (message.type === "text" && message.text?.trim()) {
-    await db.collection("conversations").doc(conversation.conversationId).update({
-      status: "refining",
+    await db.collection("conversations").doc(cid).update({
+      status: "briefing",
       updatedAt: new Date(),
     });
-    await flowEngine(phone, message, { ...conversation, status: "refining" });
+    await handleBriefing(phone, message, { ...conversation, status: "briefing" });
     return;
   }
 
-  await sendText(conversation.conversationId, phone, t("confirm.nudge"));
+  await sendText(cid, phone, t("confirm.nudge"));
 }

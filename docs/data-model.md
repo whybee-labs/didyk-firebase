@@ -26,17 +26,66 @@ Document ID is a Firestore auto-generated ID. Stored in `users/{phone}.activeCon
 |-------|------|-------------|
 | `phone` | string | E.164 phone number |
 | `status` | ConversationStatus | Current state (see below) |
-| `useCase` | string \| undefined | `"birthday"` \| `"business"` \| `"event"` |
-| `collectedData` | object | User-provided form inputs and media IDs |
-| `browsePath` | string[] \| undefined | Catalog navigation trail (e.g. `["cat-memories", "prod-birthdays"]`) |
-| `selectedFilters` | object \| undefined | Resume only: `{ withPhoto: "yes" \| "no" \| "both" }` before sample list |
-| `selectedUseCaseIds` | string[] \| undefined | Use case IDs selected at the selecting_usecases step |
-| `selectedPrimaryColor` | string \| undefined | Resume only: chosen template colour (hex) |
-| `inputMethod` | string \| undefined | Resume only: `"upload"` \| `"scratch"` |
+| `intentId` | string \| undefined | Classified intent (e.g. `"rap_from_text"`, `"product_poster"`) |
+| `structuredData` | StructuredData | Button-collected params: outputType, platform, style, etc. LLM never writes here. |
+| `unstructuredData` | UnstructuredData | LLM-owned free-form context from briefing loop |
+| `pendingQuestion` | PendingQuestion \| undefined | Active briefing question waiting for user reply |
+| `messageHistory` | HistoryEntry[] \| undefined | LLM conversation context |
 | `paymentData` | object \| undefined | Payment metadata (see below) |
+| `feedbackData` | object \| undefined | Post-delivery rating |
 | `lastMessageAt` | Timestamp | Updated on every incoming message (used for idle timeout) |
 | `createdAt` | Timestamp | |
 | `updatedAt` | Timestamp | Updated on every status change |
+
+### `structuredData` object
+
+Collected via buttons in the intake flow. Maps to AI model API parameters.
+
+```ts
+{
+  outputType: "image" | "video" | "audio"
+
+  // Image + Video
+  platform?: string       // "instagram_post" | "whatsapp_status" | "youtube_thumbnail" | etc.
+  style?: string          // "photorealistic" | "illustrated" | "cinematic" | "minimal"
+  aspectRatio?: string    // derived from platform, never asked directly
+
+  // Video
+  duration?: number       // seconds: 5 | 10 | 15 | 30
+
+  // Audio
+  genre?: string          // "rap" | "pop" | "cinematic" | "folk" | "jingle"
+  mood?: string           // "energetic" | "calm" | "dramatic" | "fun"
+
+  // Image + Video
+  referenceImageUrls: string[]  // Firebase Storage URLs — empty if no references
+}
+```
+
+### `unstructuredData` object
+
+Free-form context accumulated during the briefing loop. Keys are determined by the LLM (stored as `unstructuredData[pendingQuestion.key]`). Examples:
+
+```ts
+{
+  _initialDescription: "make a rap about my startup",  // always saved from first message
+  sourceText: "...",
+  rapStyle: "hype",
+  theme: "hustle and growth",
+  // ...anything the LLM deems useful
+}
+```
+
+### `pendingQuestion` object
+
+Stored while the bot is waiting for the user to answer a briefing question.
+
+```ts
+{
+  key: string                         // field name under unstructuredData
+  type: "list" | "boolean" | "text"   // determines how the reply is parsed
+}
+```
 
 ### `paymentData` object
 
@@ -46,28 +95,37 @@ Set during fulfillment when the Razorpay payment link is created.
 |-------|------|-------------|
 | `linkId` | string | Razorpay payment link ID — used to correlate the webhook event |
 | `amount` | number | Amount in INR |
+| `currency` | string | `"INR"` |
 | `createdAt` | Timestamp | When the link was created |
 | `paidAt` | Timestamp \| undefined | Set by webhook when payment is confirmed |
+
+### `feedbackData` object
+
+Set after delivery when the user submits a rating.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `rating` | string | Star rating from button reply (e.g. `"5"`) |
+| `submittedAt` | Timestamp | When the rating was submitted |
 
 ### ConversationStatus values
 
 | Status | Meaning |
 |--------|---------|
-| `discovery` | Welcome sent, waiting for user to pick a product or browse |
-| `browsing` | User navigating category/product catalog |
-| `form_sent` | WhatsApp Form sent, waiting for nfm_reply submission |
-| `refining` | LLM collecting remaining fields conversationally |
-| `selecting_usecases` | User choosing what to create (use case list sent) |
-| `selecting_color` | Resume only: user choosing background or accent colour |
-| `choose_input_method` | Resume only: user choosing Upload PDF vs Build from scratch |
-| `waiting_for_pdf` | Resume only: waiting for user to send resume PDF document |
-| `confirming` | Confirmation sent, waiting for button tap |
-| `generating` | Outputs being generated |
-| `awaiting_payment` | Payment CTA sent, waiting for payment |
-| `completed` | Payment received |
-| `error` | Something went wrong |
+| `intake` | Welcome sent; collecting output type, structured params, initial description |
+| `uploading` | Collecting reference images from user |
+| `briefing` | LLM question loop gathering creative context |
+| `planning` | (Video only) LLM generating scene plan; user reviewing |
+| `confirming` | (Video only) Final brief review before generation |
+| `generating` | Output being generated |
+| `awaiting_payment` | Preview sent + payment CTA sent; waiting for Razorpay webhook |
+| `delivering` | Payment confirmed; sending final output |
+| `feedback` | Rating prompt sent; waiting for user response |
+| `completed` | Conversation fully done |
 
-### `conversations/{conversationId}/messages/{messageId}` (subcollection)
+---
+
+## `conversations/{conversationId}/messages/{messageId}` (subcollection)
 
 Every incoming message is appended here (fire-and-forget, does not block routing).
 
@@ -76,54 +134,16 @@ Every incoming message is appended here (fire-and-forget, does not block routing
 | `phone` | string | Sender's E.164 number |
 | `messageId` | string | WhatsApp message ID |
 | `timestamp` | string | WhatsApp-provided timestamp |
-| `type` | string | `text`, `image`, `video`, `audio`, `document`, `button_reply`, `list_reply`, `form_reply`, etc. |
+| `type` | string | `text`, `image`, `video`, `audio`, `button_reply`, `list_reply`, etc. |
 | `text` | string? | Present for text messages |
-| `mediaId` | string? | Present for image/video/audio/document |
+| `mediaId` | string? | Present for image/video/audio messages |
 | `buttonId` | string? | Present for button replies |
 | `listId` | string? | Present for list replies |
-| `formData` | object? | Present for form replies |
 | `createdAt` | Timestamp | When this record was written |
-
-### `collectedData` structure
-
-Keys depend on the product. Examples:
-
-**Birthday:**
-```json
-{
-  "recipientName": "Priya",
-  "birthdayMessage": "Wishing you joy and happiness!",
-  "images": ["media_id_1", "media_id_2"]
-}
-```
-
-**Business Promos:**
-```json
-{
-  "shopName": "Ravi Stores",
-  "description": "50% off all electronics this weekend",
-  "images": ["media_id_1"]
-}
-```
-
-**Event:**
-```json
-{
-  "eventName": "Rahul's Wedding",
-  "dateTime": "15 April 2025, 6:30 PM",
-  "venue": "Grand Ballroom, Mumbai",
-  "images": []
-}
-```
-
-- `images` contains **WhatsApp media IDs** (not URLs). These are passed to generators.
-- Payment data is stored in the separate `paymentData` field, not in `collectedData`.
 
 ---
 
 ## Conversation Lifecycle
-
-A new conversation document is created in two cases:
 
 ```
 User messages → getOrCreateConversation()
@@ -138,10 +158,8 @@ User messages → getOrCreateConversation()
 
 Old conversations (`completed`) are **never deleted** — they serve as history.
 
-"Start Over" during confirmation resets the **same document** back to `discovery`
-(clears `useCase`, `collectedData`, `browsePath`, `selectedUseCaseIds` — no new document created).
-
-Sending `"hi"` performs the same full reset from any status.
+"hi" / "reset" / "start over" performs an in-place reset on the current doc back to `intake`
+(clears intentId, structuredData, unstructuredData, pendingQuestion, messageHistory — no new document created).
 
 ---
 
@@ -157,6 +175,4 @@ db.collection("conversations")
   .limit(1)
 ```
 
-This requires a **single-field index** (or composite) on `paymentData.linkId`. Add to `firestore.indexes.json` or create in the Firebase Console if queries fail.
-
-If you add analytics queries (e.g. "all completed conversations for this week"), add composite indexes in `firestore.indexes.json`.
+This requires a **single-field index** on `paymentData.linkId`. Add to `firestore.indexes.json` or create in the Firebase Console if queries fail.

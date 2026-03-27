@@ -1,38 +1,42 @@
-export interface ProductField {
+export type OutputType = "image" | "video" | "audio";
+
+export const PLATFORM_ASPECT_RATIO: Record<string, string> = {
+  instagram_post:      "1:1",
+  instagram_story:     "9:16",
+  instagram_reel:      "9:16",
+  whatsapp_status:     "9:16",
+  youtube_shorts:      "9:16",
+  youtube:             "16:9",
+  youtube_thumbnail:   "16:9",
+  general:             "1:1",
+};
+
+// Collected via intake buttons — maps 1:1 to AI model API params.
+// LLM never writes to this.
+export interface StructuredData {
+  outputType?: OutputType;  // set during intake step 1
+
+  // image + video
+  platform?: string;
+  style?: string;
+  aspectRatio?: string;   // derived from platform, never asked directly
+
+  // video only
+  duration?: number;      // seconds: 5 | 10 | 15 | 30
+
+  // audio only
+  genre?: string;
+  mood?: string;
+
+  // image + video
+  referenceImageUrls: string[];   // empty = no references
+}
+
+// Free-form context gathered by LLM during briefing.
+// Accumulates across the briefing loop. Fed into LLM prompts for generation.
+export type UnstructuredData = Record<string, unknown>;
+
+export interface PendingQuestion {
   key: string;
-  type: "text" | "media";
-  required: boolean;
-  label: string;       // shown in LLM prompts + confirmation summary
-  formKey?: string;    // maps to nfm_reply response_json field name
-  schema?: string;     // JSON schema example for structured fields (guides LLM extraction)
-}
-
-export type OutputType = "video" | "image" | "pdf" | "audio" | "text";
-
-export interface UseCaseOutput {
-  type: OutputType;
-  // For media types (video/image/pdf/audio): generate returns a publicly accessible URL
-  // For "text" type: generate returns the message string to send
-  generate: (data: Record<string, unknown>) => Promise<string>;
-}
-
-export interface CatalogUseCase {
-  id: string;
-  label: string;
-  description: string;
-  pricing: { INR: number; USD: number };
-  outputs: UseCaseOutput[];
-  /** Resume only: whether this template has a photo placeholder */
-  supportsPhoto?: boolean;
-}
-
-export interface ProductConfig {
-  id: "birthday" | "business" | "event" | "resume" | "wedding" | "engagement" | "party";
-  name: string;
-  description: string;
-  waFlowId: string;                                            // Meta WhatsApp Flow ID (placeholder)
-  openingPrompt: string;
-  fields: ProductField[];
-  useCases: CatalogUseCase[];
-  confirmationTemplate: (data: Record<string, unknown>) => string;
+  type: "list" | "boolean" | "text";
 }

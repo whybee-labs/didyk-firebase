@@ -3,7 +3,7 @@ import { sendText } from "services/whatsapp/sendText";
 import { sendContact } from "services/whatsapp/sendContact";
 import { sendButtons } from "services/whatsapp/sendButtons";
 import { ParsedMessage } from "services/whatsapp/parseWebhookPayload";
-import { Conversation } from "services/conversation/handleIncomingMessage";
+import { Conversation } from "types/conversation";
 import { WHATSAPP_PHONE_NUMBER } from "config/env";
 import { t } from "utils/t";
 
@@ -15,7 +15,7 @@ const RATING_MAP: Record<string, string> = {
 
 export async function sendFeedbackRequest(conversationId: string, phone: string): Promise<void> {
   await db.collection("conversations").doc(conversationId).update({
-    status: "awaiting_feedback",
+    status: "feedback",
     updatedAt: new Date(),
   });
 

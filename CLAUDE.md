@@ -1,55 +1,52 @@
-# Whybee — Claude Project Rules
+# Whybee
+
+WhatsApp-native AI content generation bot. Users describe what they want, the bot gathers context conversationally, and AI produces the final image, video, or audio — delivered directly on WhatsApp.
 
 ## Stack
-- Firebase Functions (Node 20, TypeScript) in `functions/src/`
-- Firestore (conversation state, orders)
-- Firebase Storage (generated media — not yet implemented)
-- WhatsApp Cloud API (Meta) for all user interactions
-- Razorpay for payments
-- Google Gemini (`gemini-2.0-flash`) via OpenAI-compatible SDK for LLM calls (GEMINI_API_KEY secret)
+- **Firebase Functions** (Node 20, TypeScript) in `functions/src/`
+- **Firestore** — conversation state, user records, orders
+- **Firebase Storage** — generated media
+- **WhatsApp Cloud API** (Meta) — all user interactions
+- **Razorpay** — payments
+- **Google Gemini** (`gemini-2.0-flash`) via OpenAI-compatible SDK (secret: `GEMINI_API_KEY`)
 
 ## Project Structure
 ```
 functions/src/
-  api/              # Firebase Function entry points
+  api/                  # Firebase Function entry points
   config/
-    env.ts          # Firebase secrets (GEMINI_API_KEY, WHATSAPP_*, RAZORPAY_*)
-    products/       # Per-product config (birthday, business, event) + types
-    catalog/        # Full product catalog hierarchy (categories → products → use cases)
-    translations.json  # All user-facing copy — edit here for content changes
+    env.ts              # Firebase secrets
+    intents/            # Intent registry (types.ts + index.ts)
+    products/           # StructuredData / UnstructuredData / PendingQuestion types
+    translations.json   # ALL user-facing copy lives here
+  types/
+    conversation.ts     # Shared: Conversation, ConversationStatus, HistoryEntry
   utils/
-    t.ts            # t(key, vars?) — reads from translations.json with {var} substitution
+    t.ts                # t(key, vars?) — translation helper
   services/
-    conversation/   # State machine: discovery → browsing → refining → selecting_usecases → confirming → generating → awaiting_payment
-    generators/     # Output stubs: video, image, pdf, audio, text
-    llm/            # callOpenAI() — wraps Gemini via OpenAI SDK
-    payments/       # Razorpay createPaymentLink
-    whatsapp/       # Senders (text, video, image, audio, document, buttons, list) + webhook parser
-docs/               # Architecture docs — keep updated when business logic changes
+    conversation/       # State machine handlers
+    generators/         # imageGenerator, videoGenerator, audioGenerator (stubs)
+    llm/                # callOpenAI() wraps Gemini via OpenAI-compatible SDK
+    payment/            # createPaymentLink (Razorpay)
+    whatsapp/           # Senders + webhook parser
+docs/                   # Architecture docs — keep updated (see .claude/rules/docs.md)
 ```
 
-## Coding Rules
-- Use absolute imports (`baseUrl: src` is set in tsconfig) — e.g. `import { X } from "services/foo/bar"` not `../../services/foo/bar`
-- Never use relative imports with `../` — always use absolute paths from `src/`
-- Deploy: `firebase deploy --only functions` (predeploy build runs automatically)
-- Never mention "video creation" in user-facing copy — use "content" instead
+## Conversation Flow
+```
+intake → uploading → briefing → planning* → confirming* → generating
+       → awaiting_payment → delivering → feedback → completed
+```
+*video only. See `.claude/rules/conversation-flow.md` for full constraints.
 
-## Copy / Translations Rule
-- **All user-facing strings must live in `config/translations.json`** — never hardcode copy in service files
-- Use `t("key")` or `t("key", { var: value })` from `utils/t` to read strings
-- Placeholders use `{varName}` syntax in the JSON, substituted at runtime via `t()`
-- This keeps all copy in one place and enables future multi-language support
+## Key Rules
+- All imports are absolute from `src/` — see `.claude/rules/imports.md`
+- All user-facing copy in `translations.json` — see `.claude/rules/copy.md`
+- Update docs on every business logic change — see `.claude/rules/docs.md`
 
-## Docs Rule
-**Whenever business logic is changed** (conversation states, flow configs, payment flow, media generation, WhatsApp integration), update the relevant file in `docs/`. The docs are:
-- `docs/conversation-engine.md` — state machine, transitions, handleIncomingMessage routing
-- `docs/flows.md` — flow configs, fields, outputs, pricing
-- `docs/data-model.md` — Firestore schema
-- `docs/payment.md` — Razorpay integration, webhook
-- `docs/media-generation.md` — generator stubs, Firebase Storage plan
-- `docs/whatsapp-integration.md` — senders, webhook, Meta API setup
-
-## Testing
-- Send "hi" to reset conversation to discovery from any state
-- Test media buttons in discovery: Video, Image, Audio, PDF, Text
-- Pricing stored in INR (not paise) — `createPaymentLink` multiplies by 100
+## Deploy
+```
+npm run deploy:prod     # from functions/
+npm run deploy:staging
+```
+Pricing in INR (not paise) — `createPaymentLink` multiplies by 100.

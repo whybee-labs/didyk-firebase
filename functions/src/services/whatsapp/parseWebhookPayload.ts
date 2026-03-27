@@ -1,5 +1,6 @@
 export interface ParsedMessage {
   phone: string;
+  name?: string;
   messageId: string;
   timestamp: string;
   type: "text" | "image" | "video" | "audio" | "document" | "button_reply" | "list_reply" | "form_reply" | "unknown";
@@ -22,8 +23,17 @@ export function parseWebhookPayload(payload: unknown): ParsedMessage | null {
 
   if (!message) return null;
 
+  const name: string | undefined = (payload as RawPayload)
+    ?.entry?.[0]
+    ?.changes?.[0]
+    ?.value
+    ?.contacts?.[0]
+    ?.profile
+    ?.name;
+
   const base = {
     phone: message.from as string,
+    ...(name ? { name } : {}),
     messageId: message.id as string,
     timestamp: message.timestamp as string,
   };
