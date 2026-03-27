@@ -5,16 +5,20 @@ import {
   RAZORPAY_WEBHOOK_SECRET,
   WHATSAPP_ACCESS_TOKEN,
   WHATSAPP_PHONE_NUMBER_ID,
+  OPENAI_IMAGE_API_KEY,
 } from "config/env";
 import { db } from "utils/firestore";
 import { sendText } from "services/whatsapp/sendText";
 import { dispatchOutput } from "services/conversation/fulfillment";
 import { sendFeedbackRequest } from "services/conversation/feedback";
+import { generateImage } from "services/generators/imageGenerator";
+import { generateVideo } from "services/generators/videoGenerator";
+import { generateAudio } from "services/generators/audioGenerator";
 import { StructuredData } from "config/products/types";
 import { t } from "utils/t";
 
 export const razorpayWebhook = onRequest(
-  { minInstances: 1, secrets: [RAZORPAY_WEBHOOK_SECRET, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID] },
+  { minInstances: 1, secrets: [RAZORPAY_WEBHOOK_SECRET, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, OPENAI_IMAGE_API_KEY] },
   async (req, res) => {
     if (req.method !== "POST") {
       res.status(405).send("Method Not Allowed");
@@ -98,13 +102,10 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
     let url: string;
 
     if (outputType === "image") {
-      const { generateImage } = await import("services/generators/imageGenerator");
       url = await generateImage({ structuredData, enrichedPrompt });
     } else if (outputType === "video") {
-      const { generateVideo } = await import("services/generators/videoGenerator");
       url = await generateVideo({ structuredData, enrichedPrompt, unstructuredData });
     } else {
-      const { generateAudio } = await import("services/generators/audioGenerator");
       url = await generateAudio({ structuredData, enrichedPrompt });
     }
 

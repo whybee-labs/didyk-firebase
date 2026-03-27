@@ -3,6 +3,8 @@ import { db } from "utils/firestore";
 import { ParsedMessage } from "services/whatsapp/parseWebhookPayload";
 import { sendText } from "services/whatsapp/sendText";
 import { sendButtons } from "services/whatsapp/sendButtons";
+import { downloadWhatsAppMedia } from "services/whatsapp/getMedia";
+import { uploadFile } from "services/storage/uploadFile";
 import { Conversation } from "types/conversation";
 import { handleBriefing } from "services/conversation/briefing";
 import { t } from "utils/t";
@@ -19,9 +21,6 @@ export async function handleUploading(
 
   if (message.type === "image" && message.mediaId) {
     try {
-      const { downloadWhatsAppMedia } = await import("services/whatsapp/getMedia");
-      const { uploadFile } = await import("services/storage/uploadFile");
-
       const { buffer, mimeType } = await downloadWhatsAppMedia(message.mediaId);
       const url = await uploadFile(buffer, mimeType ?? "image/jpeg", "reference-images");
 

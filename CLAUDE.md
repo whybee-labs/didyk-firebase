@@ -8,7 +8,7 @@ WhatsApp-native AI content generation bot. Users describe what they want, the bo
 - **Firebase Storage** — generated media
 - **WhatsApp Cloud API** (Meta) — all user interactions
 - **Razorpay** — payments
-- **Google Gemini** (`gemini-2.0-flash`) via OpenAI-compatible SDK (secret: `GEMINI_API_KEY`)
+- **OpenAI** — LLM (`gpt-4o-mini`, secret: `OPENAI_API_KEY`) + image generation (`gpt-image-1`, secret: `OPENAI_IMAGE_API_KEY`)
 
 ## Project Structure
 ```
@@ -25,8 +25,8 @@ functions/src/
     t.ts                # t(key, vars?) — translation helper
   services/
     conversation/       # State machine handlers
-    generators/         # imageGenerator, videoGenerator, audioGenerator (stubs)
-    llm/                # callOpenAI() wraps Gemini via OpenAI-compatible SDK
+    generators/         # imageGenerator (real), videoGenerator, audioGenerator (stubs)
+    llm/                # callOpenAI() — gpt-4o-mini for briefing/classification
     payment/            # createPaymentLink (Razorpay)
     whatsapp/           # Senders + webhook parser
 docs/                   # Architecture docs — keep updated (see .claude/rules/docs.md)
