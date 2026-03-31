@@ -5,7 +5,7 @@ import {
   RAZORPAY_WEBHOOK_SECRET,
   WHATSAPP_ACCESS_TOKEN,
   WHATSAPP_PHONE_NUMBER_ID,
-  OPENAI_IMAGE_API_KEY,
+  GOOGLE_GENAI_API_KEY,
 } from "config/env";
 import { db } from "utils/firestore";
 import { sendText } from "services/whatsapp/sendText";
@@ -18,7 +18,7 @@ import { StructuredData } from "config/products/types";
 import { t } from "utils/t";
 
 export const razorpayWebhook = onRequest(
-  { secrets: [RAZORPAY_WEBHOOK_SECRET, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, OPENAI_IMAGE_API_KEY] },
+  { secrets: [RAZORPAY_WEBHOOK_SECRET, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, GOOGLE_GENAI_API_KEY] },
   async (req, res) => {
     if (req.method !== "POST") {
       res.status(405).send("Method Not Allowed");

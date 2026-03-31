@@ -5,7 +5,7 @@ export const WHATSAPP_ACCESS_TOKEN = defineSecret("WHATSAPP_ACCESS_TOKEN");
 export const WHATSAPP_PHONE_NUMBER_ID = defineSecret("WHATSAPP_PHONE_NUMBER_ID");
 
 export const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
-export const OPENAI_IMAGE_API_KEY = defineSecret("OPENAI_IMAGE_API_KEY");
+export const GOOGLE_GENAI_API_KEY = defineSecret("GOOGLE_GENAI_API_KEY");
 
 export const RAZORPAY_KEY_ID = defineSecret("RAZORPAY_KEY_ID");
 export const RAZORPAY_KEY_SECRET = defineSecret("RAZORPAY_KEY_SECRET");
