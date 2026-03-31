@@ -12,6 +12,7 @@ import { handleBriefing } from "services/conversation/briefing";
 import { handlePlanning } from "services/conversation/planning";
 import { handleConfirmation } from "services/conversation/confirmation";
 import { handleFeedback } from "services/conversation/feedback";
+import { PREVIEW_POLICY } from "config/previewPolicy";
 
 // Re-export shared types for any files that imported them from here
 export type { Conversation, ConversationStatus, HistoryEntry };
@@ -121,7 +122,23 @@ export async function handleIncomingMessage(
       break;
 
     case "awaiting_payment":
-      await sendText(conversation.conversationId, phone, t("status.awaitingPayment"));
+      if (message.type === "button_reply" && message.buttonId === "refine_brief") {
+        const refinementCount = conversation.refinementCount ?? 0;
+        if (refinementCount < PREVIEW_POLICY.maxRefinementsPerConversation) {
+          await db.collection("conversations").doc(conversation.conversationId).update({
+            status: "briefing",
+            refinementCount: refinementCount + 1,
+            pendingQuestion: FieldValue.delete(),
+            updatedAt: new Date(),
+          });
+          conversation = { ...conversation, status: "briefing", refinementCount: refinementCount + 1, pendingQuestion: undefined };
+          await handleBriefing(phone, message, conversation);
+        } else {
+          await sendText(conversation.conversationId, phone, t("fulfillment.refinementsExhausted"));
+        }
+      } else {
+        await sendText(conversation.conversationId, phone, t("status.awaitingPayment"));
+      }
       break;
 
     case "feedback":
@@ -157,6 +174,9 @@ async function getOrCreateConversation(phone: string): Promise<{ user: User; con
           unstructuredData: (raw.unstructuredData as UnstructuredData) ?? {},
           pendingQuestion: raw.pendingQuestion as PendingQuestion | undefined,
           messageHistory: raw.messageHistory as HistoryEntry[] | undefined,
+          cleanUrl: raw.cleanUrl as string | undefined,
+          previewUrl: raw.previewUrl as string | undefined,
+          refinementCount: raw.refinementCount as number | undefined,
           paymentData: raw.paymentData as Conversation["paymentData"],
           feedbackData: raw.feedbackData as Conversation["feedbackData"],
           lastMessageAt: (raw.lastMessageAt as any)?.toDate?.() ?? new Date(0),

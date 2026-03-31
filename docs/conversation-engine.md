@@ -32,15 +32,15 @@ The conversation engine is the core of the backend. Every incoming WhatsApp mess
                 └──────┬───────┘
                        │ confirmed → generating
                 ┌──────▼───────┐
-                │  generating  │  ← outputs being generated (brief, async for video)
+                │  generating  │  ← generate once → upload clean + watermarked preview
                 └──────┬───────┘
-                       │ preview sent + payment CTA sent
+                       │ preview sent (if cap allows) + payment CTA sent
                 ┌──────▼──────────┐
                 │ awaiting_payment │  ← waiting for Razorpay webhook
-                └──────┬──────────┘
+                └──────┬──────────┘  ← "Refine brief" button → back to briefing (capped)
                        │ payment_link.paid webhook
                 ┌──────▼───────┐
-                │  delivering  │  ← send final high-quality output to user
+                │  delivering  │  ← send stored cleanUrl directly (no re-generation)
                 └──────┬───────┘
                        │
                 ┌──────▼───────┐
@@ -85,7 +85,7 @@ switch (conversation.status) {
   case "planning":         → handlePlanning()
   case "confirming":       → handleConfirmation()
   case "generating":       → "Still working on it, hang tight!"
-  case "awaiting_payment": → "Complete your payment using the link above."
+  case "awaiting_payment": → "refine_brief" button → back to briefing (if refinements remain); else → "Complete your payment using the link above."
   case "feedback":         → handleFeedback()
   default:                 → handleIntake()   // completed or unknown → restart
 }
@@ -186,14 +186,21 @@ Triggered when `status === "confirming"`. Final review before generation.
 Called by briefing (image/audio) or confirmation (video).
 
 1. Set `status: "generating"`
-2. Call generator (`generateImage` / `generateVideo` / `generateAudio`) with `structuredData` + `enrichedPrompt`
-3. Send preview label + dispatch output (sendImage / sendVideo / sendAudio)
+2. Call generator — **generates once only**:
+   - Image: `generateImage()` → `Buffer` → upload clean → `cleanUrl`; apply watermark/low-res → upload → `previewUrl`
+   - Video/Audio: `generateVideo/generateAudio()` → URL stored as both `cleanUrl` and `previewUrl` (watermarking not yet implemented)
+3. Persist `cleanUrl` + `previewUrl` on conversation doc
 4. Create Razorpay payment link → set `status: "awaiting_payment"` + store `paymentData`
-5. Send CTA button (sendCTAButton) with payment URL
+5. Check `previewGate.checkPreviewAllowed(phone)`:
+   - **Allowed**: send `previewLabel` + watermarked preview + payment CTA + "Refine brief" button (if refinements remain)
+   - **Cap hit**: send `capHitMessage` + payment CTA only (no preview shown)
+6. Increment `previewCount` on user doc (only when preview is shown)
 
 On error → send error message, set `status: "briefing"`.
 
 **Prices (INR):** image ₹99 · audio ₹149 · video ₹299
+
+**Preview policy** is controlled entirely by `config/previewPolicy.ts` — change values and redeploy, no logic changes needed.
 
 ---
 
@@ -203,9 +210,9 @@ Payment is handled by the Razorpay webhook (`api/razorpayWebhook.ts`).
 
 On `payment_link.paid`:
 1. Look up conversation by `paymentData.linkId`
-2. Set `status: "delivering"`, store `paymentData.paidAt`
-3. Generate final output (no watermark), send to user
-4. Set `status: "feedback"`, send rating prompt
+2. Store `paymentData.paidAt`
+3. Read `cleanUrl` from conversation doc — send directly via `dispatchOutput` (**no re-generation**)
+4. Send feedback prompt
 
 ---
 

@@ -27,6 +27,12 @@ export interface Conversation {
   unstructuredData: UnstructuredData;
   pendingQuestion?: PendingQuestion;
   messageHistory?: HistoryEntry[];
+  /** Original full-quality output URL — stored at generation time, delivered post-payment. */
+  cleanUrl?: string;
+  /** Watermarked / low-res preview URL — sent to user before payment. */
+  previewUrl?: string;
+  /** Number of times the user has gone back to briefing to refine within this conversation. */
+  refinementCount?: number;
   paymentData?: {
     linkId: string;
     amount: number;

@@ -16,6 +16,9 @@ Document ID is the user's E.164 phone number (e.g. `919876543210`).
 
 A user always has at most one **active** conversation. A new one is created only when the current one is `completed` or has been idle for more than 8 hours.
 
+| `previewCount` | number | Rolling count of preview generations shown to this user |
+| `previewWindowStart` | Timestamp \| undefined | Start of the current rolling window (reset when window expires) |
+
 ---
 
 ## `conversations/{conversationId}`
@@ -31,6 +34,9 @@ Document ID is a Firestore auto-generated ID. Stored in `users/{phone}.activeCon
 | `unstructuredData` | UnstructuredData | LLM-owned free-form context from briefing loop |
 | `pendingQuestion` | PendingQuestion \| undefined | Active briefing question waiting for user reply |
 | `messageHistory` | HistoryEntry[] \| undefined | LLM conversation context |
+| `cleanUrl` | string \| undefined | Original full-quality output URL — stored at generation time, delivered post-payment |
+| `previewUrl` | string \| undefined | Watermarked / low-res preview URL — sent to user before payment |
+| `refinementCount` | number \| undefined | Times the user has gone back to briefing to refine within this conversation |
 | `paymentData` | object \| undefined | Payment metadata (see below) |
 | `feedbackData` | object \| undefined | Post-delivery rating |
 | `lastMessageAt` | Timestamp | Updated on every incoming message (used for idle timeout) |

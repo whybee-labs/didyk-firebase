@@ -1,6 +1,7 @@
 import { logger } from "firebase-functions";
 import { db } from "utils/firestore";
 import { sendText } from "services/whatsapp/sendText";
+import { sendButtons } from "services/whatsapp/sendButtons";
 import { sendCTAButton } from "services/whatsapp/sendCTAButton";
 import { sendVideo } from "services/whatsapp/sendVideo";
 import { sendImage } from "services/whatsapp/sendImage";
@@ -10,7 +11,11 @@ import { Conversation } from "types/conversation";
 import { generateImage } from "services/generators/imageGenerator";
 import { generateVideo } from "services/generators/videoGenerator";
 import { generateAudio } from "services/generators/audioGenerator";
+import { uploadFile } from "services/storage/uploadFile";
+import { preparePreview } from "services/media/watermark";
+import { checkPreviewAllowed, incrementPreviewCount } from "services/previewGate";
 import { createPaymentLink } from "services/payment/createPaymentLink";
+import { PREVIEW_POLICY } from "config/previewPolicy";
 import { t } from "utils/t";
 
 // Prices in INR — placeholder until real pricing is defined
@@ -38,21 +43,29 @@ export async function startFulfillment(phone: string, conversation: Conversation
   });
 
   try {
-    let url: string;
+    let cleanUrl: string;
+    let previewUrl: string;
 
     if (outputType === "image") {
-      url = await generateImage({ structuredData: conversation.structuredData, enrichedPrompt });
+      // Generate once — upload clean original + a watermarked/low-res preview
+      const buffer = await generateImage({ structuredData: conversation.structuredData, enrichedPrompt });
+      cleanUrl = await uploadFile(buffer, "image/png", "images");
+      const previewBuffer = await preparePreview(buffer);
+      previewUrl = await uploadFile(previewBuffer, "image/png", "previews");
     } else if (outputType === "video") {
-      url = await generateVideo({ structuredData: conversation.structuredData, enrichedPrompt, unstructuredData: conversation.unstructuredData });
+      // Video watermarking not yet implemented — clean and preview are the same
+      cleanUrl = await generateVideo({ structuredData: conversation.structuredData, enrichedPrompt, unstructuredData: conversation.unstructuredData });
+      previewUrl = cleanUrl;
     } else {
-      url = await generateAudio({ structuredData: conversation.structuredData, enrichedPrompt });
+      // Audio watermarking not applicable — clean and preview are the same
+      cleanUrl = await generateAudio({ structuredData: conversation.structuredData, enrichedPrompt });
+      previewUrl = cleanUrl;
     }
 
-    // Send the preview
-    await sendText(cid, phone, t("fulfillment.previewLabel"));
-    await dispatchOutput(cid, phone, outputType, url);
+    // Persist both URLs — post-payment delivery reads cleanUrl directly, no re-generation
+    await db.collection("conversations").doc(cid).update({ cleanUrl, previewUrl });
 
-    // Create payment link and send it
+    // Create payment link before deciding whether to show preview
     const amount = PRICES[outputType];
     const { id: linkId, shortUrl } = await createPaymentLink(
       phone,
@@ -67,14 +80,38 @@ export async function startFulfillment(phone: string, conversation: Conversation
       updatedAt: new Date(),
     });
 
-    await sendCTAButton(
-      cid,
-      phone,
-      t("fulfillment.paymentPrompt"),
-      t("fulfillment.payNowButton", { amount: String(amount) }),
-      shortUrl
-    );
+    const previewAllowed = await checkPreviewAllowed(phone);
 
+    if (previewAllowed) {
+      await sendText(cid, phone, t("fulfillment.previewLabel"));
+      await dispatchOutput(cid, phone, outputType, previewUrl);
+      await incrementPreviewCount(phone);
+
+      await sendCTAButton(
+        cid,
+        phone,
+        t("fulfillment.paymentPrompt"),
+        t("fulfillment.payNowButton", { amount: String(amount) }),
+        shortUrl
+      );
+
+      // Offer refinement if the user still has refinements left
+      const refinementCount = conversation.refinementCount ?? 0;
+      if (refinementCount < PREVIEW_POLICY.maxRefinementsPerConversation) {
+        await sendButtons(cid, phone, t("fulfillment.refinePrompt"), [
+          { id: "refine_brief", title: t("fulfillment.refineButton") },
+        ]);
+      }
+    } else {
+      // Cap hit — content is generated and stored; user must pay to receive it
+      await sendCTAButton(
+        cid,
+        phone,
+        t("fulfillment.capHitMessage"),
+        t("fulfillment.payNowButton", { amount: String(amount) }),
+        shortUrl
+      );
+    }
   } catch (err) {
     logger.error("Fulfillment failed", { err });
     await sendText(cid, phone, t("errors.outputFailed"));

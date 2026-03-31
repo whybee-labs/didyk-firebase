@@ -36,10 +36,14 @@
   "confirm.nudge": "👆🏻 Tap one of the buttons above to continue.",
   "confirm.editPrompt": "What would you like to change?",
 
-  "fulfillment.previewLabel": "👇 Here's your preview:",
+  "fulfillment.previewLabel": "👇 Here's your watermarked preview:",
   "fulfillment.paymentDescription": "{outputType} creation by Whybee",
-  "fulfillment.paymentPrompt": "🎉 Happy with it? Tap below to pay and get the final high-quality version delivered here on WhatsApp.",
+  "fulfillment.paymentPrompt": "Like what you see? Pay below to get the full, watermark-free version delivered right here on WhatsApp. 🎉",
   "fulfillment.payNowButton": "✨ Pay ₹{amount}",
+  "fulfillment.refinePrompt": "Not quite right? You can adjust your brief once more.",
+  "fulfillment.refineButton": "✏️ Refine brief",
+  "fulfillment.capHitMessage": "✨ Your content is ready and waiting! Pay below to unlock and receive it right here on WhatsApp.",
+  "fulfillment.refinementsExhausted": "You've already refined this brief — pay to unlock your content, or type *reset* to start fresh.",
   "fulfillment.delivering": "🎉 Your file is on its way — enjoy! 💫",
 
   "status.generating": "⏳ Working on it, hang tight!",

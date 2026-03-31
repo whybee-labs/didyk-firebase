@@ -1,6 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
 import { GOOGLE_GENAI_API_KEY } from "config/env";
-import { uploadFile } from "services/storage/uploadFile";
 import { StructuredData } from "config/products/types";
 
 let ai: GoogleGenAI | null = null;
@@ -19,10 +18,14 @@ async function fetchAsBase64(url: string): Promise<{ data: string; mimeType: str
   return { data: buffer.toString("base64"), mimeType };
 }
 
+/**
+ * Generates an image and returns the raw PNG buffer.
+ * The caller is responsible for uploading and applying any preview transforms.
+ */
 export async function generateImage(data: {
   structuredData: StructuredData;
   enrichedPrompt: string;
-}): Promise<string> {
+}): Promise<Buffer> {
   const aspectRatio = data.structuredData.aspectRatio ?? "1:1";
   const refUrls = data.structuredData.referenceImageUrls ?? [];
 
@@ -56,6 +59,5 @@ export async function generateImage(data: {
     throw new Error("No image returned from Nano Banana 2");
   }
 
-  const buffer = Buffer.from(b64, "base64");
-  return uploadFile(buffer, "image/png", "images");
+  return Buffer.from(b64, "base64");
 }

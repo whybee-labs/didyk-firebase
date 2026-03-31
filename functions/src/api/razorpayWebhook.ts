@@ -11,10 +11,7 @@ import { db } from "utils/firestore";
 import { sendText } from "services/whatsapp/sendText";
 import { dispatchOutput } from "services/conversation/fulfillment";
 import { sendFeedbackRequest } from "services/conversation/feedback";
-import { generateImage } from "services/generators/imageGenerator";
-import { generateVideo } from "services/generators/videoGenerator";
-import { generateAudio } from "services/generators/audioGenerator";
-import { StructuredData } from "config/products/types";
+import { OutputType } from "config/products/types";
 import { t } from "utils/t";
 
 export const razorpayWebhook = onRequest(
@@ -85,33 +82,21 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
   }
 
   const phone = convData?.phone as string;
-  const structuredData = (convData?.structuredData ?? {}) as StructuredData;
-  const unstructuredData = (convData?.unstructuredData ?? {}) as Record<string, unknown>;
-  const enrichedPrompt = String(unstructuredData._enrichedPrompt ?? "");
-  const outputType = structuredData.outputType;
+  const outputType = convData?.structuredData?.outputType as OutputType | undefined;
+  const cleanUrl = convData?.cleanUrl as string | undefined;
 
   await sendText(conversationId, phone, t("fulfillment.delivering"));
 
-  if (!outputType) {
-    logger.error("No outputType on conversation, cannot dispatch final output", { conversationId });
+  if (!outputType || !cleanUrl) {
+    logger.error("Missing outputType or cleanUrl on conversation, cannot deliver", { conversationId });
     await sendText(conversationId, phone, t("errors.outputFailed"));
     return;
   }
 
   try {
-    let url: string;
-
-    if (outputType === "image") {
-      url = await generateImage({ structuredData, enrichedPrompt });
-    } else if (outputType === "video") {
-      url = await generateVideo({ structuredData, enrichedPrompt, unstructuredData });
-    } else {
-      url = await generateAudio({ structuredData, enrichedPrompt });
-    }
-
-    await dispatchOutput(conversationId, phone, outputType, url);
+    await dispatchOutput(conversationId, phone, outputType, cleanUrl);
   } catch (err) {
-    logger.error("Final output generation failed", { conversationId, err });
+    logger.error("Final output dispatch failed", { conversationId, err });
     await sendText(conversationId, phone, t("errors.outputFailed")).catch(() => undefined);
   }
 
