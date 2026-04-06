@@ -1,10 +1,11 @@
 {
-  "welcome.body": "👋🏻 Welcome to *Whybee*! I create AI-powered images, videos, and audio for you.\n\nWhat would you like to create?",
+  "welcome.body": "👋🏻 Hey! I'm *Whybee* — I turn your ideas into stunning images, videos, and audio using AI.\n\nJust pick what you'd like to create and describe your idea. I'll handle the rest!",
   "welcome.button.image": "🎨 Image",
   "welcome.button.video": "🎬 Video",
   "welcome.button.audio": "🎵 Audio",
 
-  "intake.describePrompt": "Tell me what you want to create 👇",
+  "intake.describePrompt": "Great choice! Now tell me what you have in mind — describe it however you like 👇\n\nExamples:\n• Birthday poster for my friend Sarah\n• Product shot of my sneakers\n• A crocodile playing guitar on the moon",
+  "intake.imageOnly": "📸 Nice photo! What would you like me to create with it?",
   "intake.platform": "Where will this be posted?",
   "intake.style": "What style are you going for?",
   "intake.duration": "How long should the video be?",
@@ -56,6 +57,15 @@
   "feedback.thanks": "💛 Thank you! Your feedback means a lot 🌟",
   "feedback.sharePrompt": "🔥 Glad you loved it! Know someone who'd find this useful? Share our contact 👇",
   "feedback.shareContactName": "Whybee",
+
+  "drafting.editApplied": "Got it! Here's the updated brief:",
+  "drafting.imageAttached": "📸 Photo added! Here's the updated brief:",
+  "drafting.createButton": "Create now ✨",
+  "drafting.addPhotosButton": "Add photos 📸",
+  "drafting.paymentPrompt": "Love it? Pay below and I'll generate the final high-quality version — delivered right here on WhatsApp!",
+
+  "status.processing": "⏳ Hang on, still working on your last message...",
+  "status.generatingAfterPayment": "🎉 Payment received! Creating your masterpiece now — hang tight, you'll receive it in a jiffy!",
 
   "errors.generic": "😔 Something went wrong. Please try again.",
   "errors.outputFailed": "⚠️ Something went wrong generating your file. Please try again.",

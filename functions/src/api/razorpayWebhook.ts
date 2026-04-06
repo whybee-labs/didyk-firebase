@@ -6,16 +6,18 @@ import {
   WHATSAPP_ACCESS_TOKEN,
   WHATSAPP_PHONE_NUMBER_ID,
   GOOGLE_GENAI_API_KEY,
+  OPENAI_API_KEY,
 } from "config/env";
 import { db } from "utils/firestore";
 import { sendText } from "services/whatsapp/sendText";
-import { dispatchOutput } from "services/conversation/fulfillment";
+import { generateAndDeliver } from "services/conversation/fulfillment";
 import { sendFeedbackRequest } from "services/conversation/feedback";
-import { OutputType } from "config/products/types";
+import { StructuredData, UnstructuredData } from "config/products/types";
+import { Conversation, ConversationStatus, HistoryEntry } from "types/conversation";
 import { t } from "utils/t";
 
 export const razorpayWebhook = onRequest(
-  { secrets: [RAZORPAY_WEBHOOK_SECRET, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, GOOGLE_GENAI_API_KEY] },
+  { secrets: [RAZORPAY_WEBHOOK_SECRET, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, GOOGLE_GENAI_API_KEY, OPENAI_API_KEY] },
   async (req, res) => {
     if (req.method !== "POST") {
       res.status(405).send("Method Not Allowed");
@@ -82,31 +84,47 @@ async function handlePaymentLinkPaid(body: Record<string, unknown>): Promise<voi
   }
 
   const phone = convData?.phone as string;
-  const outputType = convData?.structuredData?.outputType as OutputType | undefined;
-  const cleanUrl = convData?.cleanUrl as string | undefined;
 
-  await sendText(conversationId, phone, t("fulfillment.delivering"));
-
-  if (!outputType || !cleanUrl) {
-    logger.error("Missing outputType or cleanUrl on conversation, cannot deliver", { conversationId });
-    await sendText(conversationId, phone, t("errors.outputFailed"));
-    return;
-  }
-
-  try {
-    await dispatchOutput(conversationId, phone, outputType, cleanUrl);
-  } catch (err) {
-    logger.error("Final output dispatch failed", { conversationId, err });
-    await sendText(conversationId, phone, t("errors.outputFailed")).catch(() => undefined);
-  }
-
+  // Mark as paid immediately
   await db.collection("conversations").doc(conversationId).update({
     "paymentData.paidAt": new Date(),
     updatedAt: new Date(),
   });
 
+  // Send "working on it" message
+  await sendText(conversationId, phone, t("status.generatingAfterPayment"));
+
+  // Build conversation object for generation
+  const conversation: Conversation = {
+    conversationId,
+    phone,
+    status: (convData.status as ConversationStatus) ?? "awaiting_payment",
+    intentId: convData.intentId as string | undefined,
+    structuredData: (convData.structuredData as StructuredData) ?? { referenceImageUrls: [] },
+    unstructuredData: (convData.unstructuredData as UnstructuredData) ?? {},
+    messageHistory: convData.messageHistory as HistoryEntry[] | undefined,
+    cleanUrl: convData.cleanUrl as string | undefined,
+    previewUrl: convData.previewUrl as string | undefined,
+    refinementCount: convData.refinementCount as number | undefined,
+    paymentData: convData.paymentData as Conversation["paymentData"],
+    feedbackData: convData.feedbackData as Conversation["feedbackData"],
+    lastMessageAt: (convData.lastMessageAt as any)?.toDate?.() ?? new Date(0),
+    createdAt: (convData.createdAt as any)?.toDate?.() ?? new Date(0),
+    updatedAt: (convData.updatedAt as any)?.toDate?.() ?? new Date(0),
+  };
+
+  // Generate and deliver
+  try {
+    await generateAndDeliver(phone, conversation);
+  } catch (err) {
+    logger.error("Post-payment generation failed", { conversationId, err });
+    await sendText(conversationId, phone, t("errors.outputFailed")).catch(() => undefined);
+    return;
+  }
+
+  // Send feedback request after a short delay
   await new Promise((resolve) => setTimeout(resolve, 4000));
   await sendFeedbackRequest(conversationId, phone);
 
-  logger.info("Payment confirmed, final output dispatched", { conversationId, phone });
+  logger.info("Payment confirmed, content generated and delivered", { conversationId, phone });
 }

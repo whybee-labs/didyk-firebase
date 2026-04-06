@@ -4,7 +4,7 @@ import { sendText } from "services/whatsapp/sendText";
 import { t } from "utils/t";
 import { Conversation } from "types/conversation";
 import { handleBriefing } from "services/conversation/briefing";
-import { startFulfillment } from "./fulfillment";
+import { createOrderAndRequestPayment } from "services/conversation/fulfillment";
 import { ParsedMessage } from "services/whatsapp/parseWebhookPayload";
 
 export async function sendConfirmation(phone: string, conversation: Conversation): Promise<void> {
@@ -48,7 +48,7 @@ export async function handleConfirmation(
 
   if (message.type === "button_reply") {
     if (message.buttonId === "create") {
-      await startFulfillment(phone, conversation);
+      await createOrderAndRequestPayment(phone, conversation);
       return;
     }
     if (message.buttonId === "edit") {

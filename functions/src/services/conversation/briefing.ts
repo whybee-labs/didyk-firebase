@@ -9,7 +9,7 @@ import { getIntent, genericIntentId } from "config/intents";
 import { PendingQuestion } from "config/products/types";
 import { Conversation, HistoryEntry } from "types/conversation";
 import { handlePlanning } from "services/conversation/planning";
-import { startFulfillment } from "services/conversation/fulfillment";
+import { createOrderAndRequestPayment } from "services/conversation/fulfillment";
 import { t } from "utils/t";
 
 export async function handleBriefing(
@@ -173,6 +173,6 @@ async function transitionFromBriefing(cid: string, phone: string, conversation: 
       status: "planning",
     });
   } else {
-    await startFulfillment(phone, { ...conversation, status: "generating" });
+    await createOrderAndRequestPayment(phone, { ...conversation, status: "awaiting_payment" });
   }
 }

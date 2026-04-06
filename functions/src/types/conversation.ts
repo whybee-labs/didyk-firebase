@@ -4,6 +4,7 @@ export type ConversationStatus =
   | "intake"
   | "uploading"
   | "briefing"
+  | "drafting"
   | "planning"
   | "confirming"
   | "generating"
@@ -26,6 +27,8 @@ export interface Conversation {
   structuredData: StructuredData;
   unstructuredData: UnstructuredData;
   pendingQuestion?: PendingQuestion;
+  /** True while an async operation (LLM call, image upload, generation) is in progress. */
+  processing?: boolean;
   messageHistory?: HistoryEntry[];
   /** Original full-quality output URL — stored at generation time, delivered post-payment. */
   cleanUrl?: string;

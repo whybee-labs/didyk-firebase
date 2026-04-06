@@ -10,37 +10,28 @@ The conversation engine is the core of the backend. Every incoming WhatsApp mess
                 ┌──────────────┐
   new user      │    intake    │  ← welcome: Image / Video / Audio buttons
                 └──────┬───────┘
-                       │ output type chosen → discovery message + describe prompt
-                       │ user sends description → classify intent → collect structured params
-                       │ ref images? → uploading | no → briefing
+                       │ output type chosen → "describe what you want"
+                       │ user sends description → Creative Director LLM call
+                       │ CD ready? → drafting (with summary)
+                       │ CD needs info? → drafting (with question)
                 ┌──────▼───────┐
-                │   uploading  │  ← user sends reference images → stored in Firebase Storage
-                └──────┬───────┘
-                       │ user taps "Done" → briefing
-                ┌──────▼───────┐
-                │   briefing   │  ← LLM question loop: list / boolean / text questions
-                └──────┬───────┘
-                       │ ready:true → send enrichedPrompt → user confirms or pushes back
-                       │ image/audio: → generating
-                       │ video: → planning
-                ┌──────▼───────┐
-                │   planning   │  ← (video only) LLM generates scene plan, user reviews
-                └──────┬───────┘
-                       │ approved → confirming
-                ┌──────▼───────┐
-                │  confirming  │  ← (video only) full summary, user taps Confirm
-                └──────┬───────┘
-                       │ confirmed → generating
-                ┌──────▼───────┐
-                │  generating  │  ← generate once → upload clean + watermarked preview
-                └──────┬───────┘
-                       │ preview sent (if cap allows) + payment CTA sent
+                │   drafting   │  ← Creative Director conversation loop
+                └──────┬───────┘  ← user can send text, tap buttons/list, or send images
+                       │ "Add photos" → uploading (sub-flow, returns to drafting)
+                       │ CD asks question → renders as buttons/list/text
+                       │ CD ready → shows draft summary + "Create now" / "Add photos"
+                       │ user requests changes → CD revises draft, stays in drafting
+                       │ "Create now" → createOrderAndRequestPayment
                 ┌──────▼──────────┐
-                │ awaiting_payment │  ← waiting for Razorpay webhook
-                └──────┬──────────┘  ← "Refine brief" button → back to briefing (capped)
+                │ awaiting_payment │  ← payment CTA sent; waiting for Razorpay webhook
+                └──────┬──────────┘  ← "Refine brief" button → back to drafting (capped)
                        │ payment_link.paid webhook
                 ┌──────▼───────┐
-                │  delivering  │  ← send stored cleanUrl directly (no re-generation)
+                │  generating  │  ← generateAndDeliver: generate + upload + send
+                └──────┬───────┘
+                       │
+                ┌──────▼───────┐
+                │  delivering  │  ← final output sent to user
                 └──────┬───────┘
                        │
                 ┌──────▼───────┐
@@ -51,6 +42,22 @@ The conversation engine is the core of the backend. Every incoming WhatsApp mess
                 │  completed   │
                 └──────────────┘
 ```
+
+### Pay-first flow
+
+No image generation happens before payment. The draft summary (title + enriched prompt + style/mood/aspect ratio) is the preview. The user approves the draft, pays, and only then does generation begin. This eliminates wasted GPU costs on unpaid previews.
+
+```
+drafting (draft summary) → awaiting_payment → generating → delivering
+```
+
+### Processing lock
+
+A `processing` boolean field on the conversation document prevents double-handling during async operations (LLM calls, image uploads, generation). When `processing` is true, incoming messages receive a "please wait" response and are not routed to any handler.
+
+### Legacy states (backward compatibility)
+
+`briefing`, `planning`, and `confirming` still exist in the `ConversationStatus` type and are handled by the message router. Existing conversations that were created before the Creative Director overhaul continue to use these states. New conversations use the `drafting` state instead.
 
 "hi" / "reset" / "start over" → resets conversation to `intake` from any state.
 New conversation created when: status is `completed`, idle > 8 hours, or no active conversation.
@@ -75,17 +82,22 @@ New conversation created when: status is `completed`, idle > 8 hours, or no acti
 
 5. **Log message** — append to `conversations/{id}/messages/` subcollection (fire-and-forget)
 
-6. **Route by status**:
+6. **Append to `messageHistory`** — incoming user text added to rolling window (last 10 entries) for LLM context (skipped on reset)
+
+7. **Processing lock check** — if `conversation.processing` is true, send "please wait" message and return (no routing)
+
+8. **Route by status**:
 
 ```ts
 switch (conversation.status) {
   case "intake":           → handleIntake()
   case "uploading":        → handleUploading()
-  case "briefing":         → handleBriefing()
-  case "planning":         → handlePlanning()
-  case "confirming":       → handleConfirmation()
+  case "drafting":         → handleDrafting()
+  case "briefing":         → handleBriefing()       // legacy
+  case "planning":         → handlePlanning()        // legacy (video)
+  case "confirming":       → handleConfirmation()    // legacy (video)
   case "generating":       → "Still working on it, hang tight!"
-  case "awaiting_payment": → "refine_brief" button → back to briefing (if refinements remain); else → "Complete your payment using the link above."
+  case "awaiting_payment": → "refine_brief" button → back to drafting (if refinements remain); else → "Complete your payment using the link above."
   case "feedback":         → handleFeedback()
   default:                 → handleIntake()   // completed or unknown → restart
 }
@@ -97,110 +109,113 @@ switch (conversation.status) {
 
 **File:** `services/conversation/intake.ts`
 
-Triggered when `status === "intake"`. Collects the output type and structured parameters.
+Triggered when `status === "intake"`. Collects the output type and immediately invokes the Creative Director.
 
 **First message (no outputType yet):**
-- Sends welcome with 3 buttons: 🎨 Image / 🎬 Video / 🎵 Audio
-- `button_reply` → stores `structuredData.outputType`, sends dynamic discovery message (built from intents), asks for description
+- Sends welcome with 3 buttons: Image / Video / Audio
+- `button_reply` → stores `structuredData.outputType`, sends "describe what you want" prompt
 
-**After outputType set, awaiting description (text message):**
-- Calls LLM to classify intent → stores `intentId` + `unstructuredData._initialDescription`
-- Calls `promptNextParam()` to collect structured params (platform, style, genre, mood) as button sequences
-- Once all params collected → checks `intent.supportsReferenceImages`
-  - Yes → sends reference images prompt, sets `status: "uploading"`
-  - No → sets `status: "briefing"`, calls `handleBriefing()`
+**After outputType set — user sends description (text or image+caption):**
+- Calls Creative Director LLM with the user's message, conversation history, and reference image count
+- Sets `processing: true` during the async LLM call
+- Transitions to `status: "drafting"`
+- If Creative Director returns `ready: true` → persists draft (title, enrichedPrompt, style, mood, aspectRatio) and sends draft summary with "Create now" / "Add photos" buttons
+- If Creative Director returns `ready: false` → stores `pendingQuestion` and renders the question as buttons/list/text
 
-**Structured params collected in order:**
-- Image: platform → style
-- Video: platform → style → duration
-- Audio: genre → mood
+**Image without caption:** stored as reference image, user prompted to describe what they want.
+
+**No more intent classification or structured param collection** — the Creative Director infers style, mood, aspect ratio, and everything else from the conversation. `structuredData` now only holds `outputType`, `aspectRatio` (set by Creative Director), and `referenceImageUrls`.
 
 ---
 
-## Phase 2 — Uploading
+## Phase 2 — Uploading (sub-flow from drafting)
 
 **File:** `services/conversation/uploading.ts`
 
-Triggered when `status === "uploading"`. Collects reference images.
+Triggered when `status === "uploading"`. Collects reference images. This is a sub-flow — the user enters uploading from `drafting` (via "Add photos" button) and returns to `drafting` when done.
 
 - Image messages: download from Meta, upload to Firebase Storage → append URL to `structuredData.referenceImageUrls`
-- "Done" button or `button_reply` with `id === "no_images"` → set `status: "briefing"`, call `handleBriefing()`
+- "Done" button or `button_reply` with `id === "upload_done"` → set `status: "drafting"`, re-run Creative Director
 - Text messages → nudge to send images or tap Done
 
 ---
 
-## Phase 3 — Briefing
+## Phase 3 — Drafting (Creative Director)
 
-**File:** `services/conversation/briefing.ts`
+**File:** `services/conversation/drafting.ts`
 
-Triggered when `status === "briefing"`. LLM-driven question loop.
+Triggered when `status === "drafting"`. This is the main creative conversation loop, powered by the Creative Director LLM.
 
-**On entry (no `pendingQuestion`):**
-- Calls LLM with `structuredData` + `unstructuredData` + intent config
-- LLM returns `{ ready: false, question: { key, type, text, options? } }` or `{ ready: true, enrichedPrompt }`
+**Handles:**
+- **"Create now" button** → calls `createOrderAndRequestPayment()` (pay-first, no generation)
+- **"Add photos" button** → transitions to `uploading` sub-flow
+- **Image sent directly** → auto-attaches as reference image, re-runs Creative Director with updated context
+- **Text / button reply / list reply** → extracts user text, clears `pendingQuestion` if one was pending, re-runs Creative Director
 
-**If `ready: false`:**
-- Render question as WhatsApp component (list → sendList, boolean → sendButtons, text → sendText)
-- Store `pendingQuestion: { key, type }` on conversation doc
+**Creative Director result handling:**
+- `ready: true` → persists draft fields (`_title`, `_enrichedPrompt`, `_style`, `_mood`, `_aspectRatio` in `unstructuredData`; `aspectRatio` in `structuredData`) → sends draft summary with "Create now" / "Add photos" buttons
+- `ready: false` → stores `pendingQuestion`, renders question as buttons (max 3) / list (4+ options) / text input
 
-**On user reply (pendingQuestion exists):**
-- Map reply to `unstructuredData[pendingQuestion.key]`, clear `pendingQuestion`
-- Call LLM again
+**Draft summary format:**
+```
+✨ *Short Catchy Title*
 
-**If `ready: true`:**
-- Send `enrichedPrompt` to user + "Does this look right?" (Yes / Add more detail buttons)
-- Yes → `transitionFromBriefing()`: image/audio → `generating` + `startFulfillment()`; video → `planning` + `handlePlanning()`
-- No / text → feed reply back into briefing loop, continue
+Vivid detailed creative brief...
 
----
+📐 1:1 • 🎨 Cinematic • Bold
+📎 2 reference image(s)
 
-## Phase 4 — Planning (Video Only)
+Tap Create now to generate, or just tell me what to change.
+[Create now] [Add photos]
+```
 
-**File:** `services/conversation/planning.ts`
+**Editing the draft:** User can send free text at any time to request changes. The Creative Director receives the `previousDraft` context and applies only the requested modifications. No state change — stays in `drafting`.
 
-Triggered when `status === "planning"`. LLM generates a scene plan.
-
-- On entry: LLM produces scene descriptions, music direction, colour palette
-- Sent to user as a text summary + Approve / Revise buttons
-- Approve → set `status: "confirming"`, call `sendConfirmation()`
-- Revise or text → feed feedback back into planning loop
+**Fallback:** If an unrecognized message type arrives, re-shows the current draft summary or the "describe what you want" prompt.
 
 ---
 
-## Phase 5 — Confirming (Video Only)
+## Phases 4-5 — Planning & Confirming (Legacy, Video Only)
 
-**File:** `services/conversation/confirmation.ts`
+**Files:** `services/conversation/planning.ts`, `services/conversation/confirmation.ts`
 
-Triggered when `status === "confirming"`. Final review before generation.
+These states still exist for backward compatibility with conversations created before the Creative Director overhaul. New conversations go through `drafting` instead.
 
-- Shows full brief summary + Confirm / Edit buttons
-- Confirm → set `status: "generating"`, call `startFulfillment()`
-- Edit → set `status: "briefing"`, call `handleBriefing()` to re-enter the loop
+- **Planning:** LLM generates scene plan, user approves or revises
+- **Confirming:** Final brief review before generation
 
 ---
 
-## Phase 6 — Fulfillment
+## Phase 6 — Fulfillment (Pay-First)
 
 **File:** `services/conversation/fulfillment.ts`
 
-Called by briefing (image/audio) or confirmation (video).
+Fulfillment is now split into two separate functions:
 
-1. Set `status: "generating"`
-2. Call generator — **generates once only**:
-   - Image: `generateImage()` → `Buffer` → upload clean → `cleanUrl`; apply watermark/low-res → upload → `previewUrl`
-   - Video/Audio: `generateVideo/generateAudio()` → URL stored as both `cleanUrl` and `previewUrl` (watermarking not yet implemented)
-3. Persist `cleanUrl` + `previewUrl` on conversation doc
-4. Create Razorpay payment link → set `status: "awaiting_payment"` + store `paymentData`
-5. Check `previewGate.checkPreviewAllowed(phone)`:
-   - **Allowed**: send `previewLabel` + watermarked preview + payment CTA + "Refine brief" button (if refinements remain)
-   - **Cap hit**: send `capHitMessage` + payment CTA only (no preview shown)
-6. Increment `previewCount` on user doc (only when preview is shown)
+### `createOrderAndRequestPayment(phone, conversation)`
 
-On error → send error message, set `status: "briefing"`.
+Called from `drafting` when user taps "Create now". **No generation happens here.**
+
+1. Create Razorpay payment link
+2. Set `status: "awaiting_payment"` + store `paymentData` (linkId, amount, currency, createdAt)
+3. Send payment CTA button via `sendCTAButton`
+
+### `generateAndDeliver(phone, conversation)`
+
+Called from the Razorpay webhook (`api/razorpayWebhook.ts`) after payment is confirmed.
+
+1. Set `status: "generating"` + `processing: true`
+2. Call generator:
+   - Image: `generateImage()` → `Buffer` → upload → `cleanUrl`
+   - Video: `generateVideo()` → URL → `cleanUrl`
+   - Audio: `generateAudio()` → URL → `cleanUrl`
+3. Set `status: "delivering"` + persist `cleanUrl`
+4. Send final output via `dispatchOutput` (sendImage/sendVideo/sendAudio)
+5. Set `processing: false`
+
+On error → send error message, set `status: "drafting"` (user can retry after fixing).
 
 **Prices (INR):** image ₹99 · audio ₹149 · video ₹299
-
-**Preview policy** is controlled entirely by `config/previewPolicy.ts` — change values and redeploy, no logic changes needed.
 
 ---
 
@@ -210,9 +225,11 @@ Payment is handled by the Razorpay webhook (`api/razorpayWebhook.ts`).
 
 On `payment_link.paid`:
 1. Look up conversation by `paymentData.linkId`
-2. Store `paymentData.paidAt`
-3. Read `cleanUrl` from conversation doc — send directly via `dispatchOutput` (**no re-generation**)
-4. Send feedback prompt
+2. Guard against duplicate processing (skip if `paidAt` already set)
+3. Store `paymentData.paidAt`
+4. Send "working on it" message
+5. Call `generateAndDeliver(phone, conversation)` — this is where generation actually happens (pay-first model)
+6. After delivery, wait 4s then send feedback prompt
 
 ---
 

@@ -18,7 +18,8 @@ export async function callOpenAI(
   systemPrompt: string,
   userMessage: string,
   jsonMode = true,
-  history?: Array<{ role: "user" | "assistant"; content: string }>
+  history?: Array<{ role: "user" | "assistant"; content: string }>,
+  temperature = 0.2
 ): Promise<string> {
   const openai = getClient();
 
@@ -35,7 +36,7 @@ export async function callOpenAI(
     model: MODEL,
     ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
     messages,
-    temperature: 0.2,
+    temperature,
   });
 
   return response.choices[0]?.message?.content ?? (jsonMode ? "{}" : "");

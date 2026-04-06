@@ -9,6 +9,7 @@ import { Conversation, ConversationStatus, HistoryEntry } from "types/conversati
 import { handleIntake } from "services/conversation/intake";
 import { handleUploading } from "services/conversation/uploading";
 import { handleBriefing } from "services/conversation/briefing";
+import { handleDrafting } from "services/conversation/drafting";
 import { handlePlanning } from "services/conversation/planning";
 import { handleConfirmation } from "services/conversation/confirmation";
 import { handleFeedback } from "services/conversation/feedback";
@@ -96,6 +97,12 @@ export async function handleIncomingMessage(
     }
   }
 
+  // Processing lock — if an async operation is in progress, ask user to wait
+  if (conversation.processing) {
+    await sendText(conversation.conversationId, phone, t("status.processing"));
+    return;
+  }
+
   switch (conversation.status) {
     case "intake":
       await handleIntake(phone, message, conversation);
@@ -103,6 +110,10 @@ export async function handleIncomingMessage(
 
     case "uploading":
       await handleUploading(phone, message, conversation);
+      break;
+
+    case "drafting":
+      await handleDrafting(phone, message, conversation);
       break;
 
     case "briefing":
@@ -126,13 +137,13 @@ export async function handleIncomingMessage(
         const refinementCount = conversation.refinementCount ?? 0;
         if (refinementCount < PREVIEW_POLICY.maxRefinementsPerConversation) {
           await db.collection("conversations").doc(conversation.conversationId).update({
-            status: "briefing",
+            status: "drafting",
             refinementCount: refinementCount + 1,
             pendingQuestion: FieldValue.delete(),
             updatedAt: new Date(),
           });
-          conversation = { ...conversation, status: "briefing", refinementCount: refinementCount + 1, pendingQuestion: undefined };
-          await handleBriefing(phone, message, conversation);
+          conversation = { ...conversation, status: "drafting", refinementCount: refinementCount + 1, pendingQuestion: undefined };
+          await handleDrafting(phone, message, conversation);
         } else {
           await sendText(conversation.conversationId, phone, t("fulfillment.refinementsExhausted"));
         }
@@ -173,6 +184,7 @@ async function getOrCreateConversation(phone: string): Promise<{ user: User; con
           structuredData: (raw.structuredData as StructuredData) ?? { referenceImageUrls: [] },
           unstructuredData: (raw.unstructuredData as UnstructuredData) ?? {},
           pendingQuestion: raw.pendingQuestion as PendingQuestion | undefined,
+          processing: raw.processing as boolean | undefined,
           messageHistory: raw.messageHistory as HistoryEntry[] | undefined,
           cleanUrl: raw.cleanUrl as string | undefined,
           previewUrl: raw.previewUrl as string | undefined,

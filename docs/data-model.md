@@ -29,14 +29,15 @@ Document ID is a Firestore auto-generated ID. Stored in `users/{phone}.activeCon
 |-------|------|-------------|
 | `phone` | string | E.164 phone number |
 | `status` | ConversationStatus | Current state (see below) |
-| `intentId` | string \| undefined | Classified intent (e.g. `"rap_from_text"`, `"product_poster"`) |
-| `structuredData` | StructuredData | Button-collected params: outputType, platform, style, etc. LLM never writes here. |
-| `unstructuredData` | UnstructuredData | LLM-owned free-form context from briefing loop |
-| `pendingQuestion` | PendingQuestion \| undefined | Active briefing question waiting for user reply |
+| `intentId` | string \| undefined | Legacy: classified intent (e.g. `"rap_from_text"`). Not used in new Creative Director flow. |
+| `structuredData` | StructuredData | Minimal params: outputType, aspectRatio, referenceImageUrls. Creative Director sets aspectRatio. |
+| `unstructuredData` | UnstructuredData | Creative Director-owned: `_title`, `_enrichedPrompt`, `_style`, `_mood`, `_aspectRatio` |
+| `pendingQuestion` | PendingQuestion \| undefined | Active Creative Director question waiting for user reply |
 | `messageHistory` | HistoryEntry[] \| undefined | LLM conversation context |
-| `cleanUrl` | string \| undefined | Original full-quality output URL — stored at generation time, delivered post-payment |
-| `previewUrl` | string \| undefined | Watermarked / low-res preview URL — sent to user before payment |
-| `refinementCount` | number \| undefined | Times the user has gone back to briefing to refine within this conversation |
+| `cleanUrl` | string \| undefined | Original full-quality output URL — set post-payment during `generateAndDeliver`, then delivered immediately |
+| `previewUrl` | string \| undefined | Watermarked / low-res preview URL (legacy — not used in pay-first flow) |
+| `processing` | boolean \| undefined | True while an async operation (LLM call, image upload, generation) is in progress. Prevents double-handling of messages. |
+| `refinementCount` | number \| undefined | Times the user has gone back to drafting to refine within this conversation |
 | `paymentData` | object \| undefined | Payment metadata (see below) |
 | `feedbackData` | object \| undefined | Post-delivery rating |
 | `lastMessageAt` | Timestamp | Updated on every incoming message (used for idle timeout) |
@@ -45,51 +46,46 @@ Document ID is a Firestore auto-generated ID. Stored in `users/{phone}.activeCon
 
 ### `structuredData` object
 
-Collected via buttons in the intake flow. Maps to AI model API parameters.
+Minimal button-collected params. The Creative Director infers style, mood, and aspect ratio from conversation context.
 
 ```ts
 {
   outputType: "image" | "video" | "audio"
-
-  // Image + Video
-  platform?: string       // "instagram_post" | "whatsapp_status" | "youtube_thumbnail" | etc.
-  style?: string          // "photorealistic" | "illustrated" | "cinematic" | "minimal"
-  aspectRatio?: string    // derived from platform, never asked directly
-
-  // Video
-  duration?: number       // seconds: 5 | 10 | 15 | 30
-
-  // Audio
-  genre?: string          // "rap" | "pop" | "cinematic" | "folk" | "jingle"
-  mood?: string           // "energetic" | "calm" | "dramatic" | "fun"
-
-  // Image + Video
+  aspectRatio?: string    // set by Creative Director ("1:1" | "9:16" | "16:9")
   referenceImageUrls: string[]  // Firebase Storage URLs — empty if no references
+
+  // Legacy fields (old conversations only — no longer collected for new ones)
+  platform?: string
+  style?: string
+  duration?: number
+  genre?: string
+  mood?: string
 }
 ```
 
 ### `unstructuredData` object
 
-Free-form context accumulated during the briefing loop. Keys are determined by the LLM (stored as `unstructuredData[pendingQuestion.key]`). Examples:
+Creative Director-managed fields. The CD stores its draft output here with underscore-prefixed keys.
 
 ```ts
 {
-  _initialDescription: "make a rap about my startup",  // always saved from first message
-  sourceText: "...",
-  rapStyle: "hype",
-  theme: "hustle and growth",
-  // ...anything the LLM deems useful
+  _title: "Short Catchy Title",              // set when CD returns ready:true
+  _enrichedPrompt: "Vivid detailed brief...",// the full creative brief for the generator
+  _style: "Cinematic",                       // inferred by CD
+  _mood: "Bold",                             // inferred by CD
+  _aspectRatio: "1:1",                       // mirrored from structuredData for display
+  // ...any other keys from legacy briefing loop conversations
 }
 ```
 
 ### `pendingQuestion` object
 
-Stored while the bot is waiting for the user to answer a briefing question.
+Stored while the bot is waiting for the user to answer a Creative Director question.
 
 ```ts
 {
-  key: string                         // field name under unstructuredData
-  type: "list" | "boolean" | "text"   // determines how the reply is parsed
+  key: string                         // field name under unstructuredData (typically "_lastAnswer")
+  type: "list" | "boolean" | "text"   // determines how the reply is parsed ("boolean" used for buttons)
 }
 ```
 
@@ -118,14 +114,15 @@ Set after delivery when the user submits a rating.
 
 | Status | Meaning |
 |--------|---------|
-| `intake` | Welcome sent; collecting output type, structured params, initial description |
-| `uploading` | Collecting reference images from user |
-| `briefing` | LLM question loop gathering creative context |
-| `planning` | (Video only) LLM generating scene plan; user reviewing |
-| `confirming` | (Video only) Final brief review before generation |
-| `generating` | Output being generated |
-| `awaiting_payment` | Preview sent + payment CTA sent; waiting for Razorpay webhook |
-| `delivering` | Payment confirmed; sending final output |
+| `intake` | Welcome sent; collecting output type, then first description triggers Creative Director |
+| `uploading` | Collecting reference images from user (sub-flow from `drafting`) |
+| `drafting` | Creative Director conversation loop — questions, draft summary, edits |
+| `briefing` | *(Legacy)* Old LLM question loop — kept for backward compat |
+| `planning` | *(Legacy, video only)* LLM generating scene plan; user reviewing |
+| `confirming` | *(Legacy, video only)* Final brief review before generation |
+| `generating` | Output being generated (post-payment) |
+| `awaiting_payment` | Draft approved, payment CTA sent; waiting for Razorpay webhook |
+| `delivering` | Payment confirmed; final output sent to user |
 | `feedback` | Rating prompt sent; waiting for user response |
 | `completed` | Conversation fully done |
 

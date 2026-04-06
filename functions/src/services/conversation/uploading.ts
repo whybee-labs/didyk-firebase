@@ -6,7 +6,7 @@ import { sendButtons } from "services/whatsapp/sendButtons";
 import { downloadWhatsAppMedia } from "services/whatsapp/getMedia";
 import { uploadFile } from "services/storage/uploadFile";
 import { Conversation } from "types/conversation";
-import { handleBriefing } from "services/conversation/briefing";
+import { handleDrafting } from "services/conversation/drafting";
 import { t } from "utils/t";
 
 const MAX_IMAGES = 5;
@@ -20,6 +20,7 @@ export async function handleUploading(
   const current = conversation.structuredData.referenceImageUrls ?? [];
 
   if (message.type === "image" && message.mediaId) {
+    await setProcessing(cid, true);
     try {
       const { buffer, mimeType } = await downloadWhatsAppMedia(message.mediaId);
       const url = await uploadFile(buffer, mimeType ?? "image/jpeg", "reference-images");
@@ -37,34 +38,46 @@ export async function handleUploading(
           ...(remaining > 0 ? [{ id: "upload_more", title: t("uploading.sendMore") }] : []),
         ]);
       } else {
-        await proceedToBriefing(cid, phone, conversation);
+        await proceedToDrafting(cid, phone, {
+          ...conversation,
+          structuredData: { ...conversation.structuredData, referenceImageUrls: updated },
+        });
       }
     } catch (err) {
       logger.error("Image upload failed", { err });
       await sendText(cid, phone, t("errors.imageUploadFailed"));
+    } finally {
+      await setProcessing(cid, false);
     }
     return;
   }
 
-  // User tapped "Done" or sent text — proceed to briefing
+  // User tapped "Done" or sent text — proceed to drafting
   if (
     (message.type === "button_reply" && message.buttonId === "upload_done") ||
     (message.type === "text")
   ) {
-    await proceedToBriefing(cid, phone, conversation);
+    await proceedToDrafting(cid, phone, conversation);
     return;
   }
 
   await sendText(cid, phone, t("uploading.prompt"));
 }
 
-async function proceedToBriefing(cid: string, phone: string, conversation: Conversation): Promise<void> {
+async function proceedToDrafting(cid: string, phone: string, conversation: Conversation): Promise<void> {
   await db.collection("conversations").doc(cid).update({
-    status: "briefing",
+    status: "drafting",
     updatedAt: new Date(),
   });
-  await handleBriefing(phone, { type: "text", text: "" } as ParsedMessage, {
+  await handleDrafting(phone, { type: "text", text: "" } as ParsedMessage, {
     ...conversation,
-    status: "briefing",
+    status: "drafting",
   });
+}
+
+async function setProcessing(cid: string, value: boolean): Promise<void> {
+  await db.collection("conversations").doc(cid).update({
+    processing: value,
+    updatedAt: new Date(),
+  }).catch((err) => logger.warn("Failed to set processing flag", { err, cid, value }));
 }

@@ -1,7 +1,6 @@
 import { logger } from "firebase-functions";
 import { db } from "utils/firestore";
 import { sendText } from "services/whatsapp/sendText";
-import { sendButtons } from "services/whatsapp/sendButtons";
 import { sendCTAButton } from "services/whatsapp/sendCTAButton";
 import { sendVideo } from "services/whatsapp/sendVideo";
 import { sendImage } from "services/whatsapp/sendImage";
@@ -12,113 +11,94 @@ import { generateImage } from "services/generators/imageGenerator";
 import { generateVideo } from "services/generators/videoGenerator";
 import { generateAudio } from "services/generators/audioGenerator";
 import { uploadFile } from "services/storage/uploadFile";
-import { preparePreview } from "services/media/watermark";
-import { checkPreviewAllowed, incrementPreviewCount } from "services/previewGate";
 import { createPaymentLink } from "services/payment/createPaymentLink";
-import { PREVIEW_POLICY } from "config/previewPolicy";
 import { t } from "utils/t";
 
-// Prices in INR — placeholder until real pricing is defined
 const PRICES: Record<OutputType, number> = {
   image: 99,
   video: 299,
   audio: 149,
 };
 
-export async function startFulfillment(phone: string, conversation: Conversation): Promise<void> {
-  logger.info("Fulfillment started", {
+/**
+ * Pay-first: create payment link and send CTA button. No generation yet.
+ * Called from drafting when user taps "Create now".
+ */
+export async function createOrderAndRequestPayment(phone: string, conversation: Conversation): Promise<void> {
+  const cid = conversation.conversationId;
+  const outputType = conversation.structuredData.outputType!;
+  const amount = PRICES[outputType];
+
+  logger.info("Creating payment order", { phone, cid, outputType, amount });
+
+  const { id: linkId, shortUrl } = await createPaymentLink(
     phone,
-    conversationId: conversation.conversationId,
-    outputType: conversation.structuredData.outputType,
-    intentId: conversation.intentId,
+    cid,
+    amount,
+    t("fulfillment.paymentDescription", { outputType })
+  );
+
+  await db.collection("conversations").doc(cid).update({
+    status: "awaiting_payment",
+    paymentData: { linkId, amount, currency: "INR", createdAt: new Date() },
+    updatedAt: new Date(),
   });
 
+  await sendCTAButton(
+    cid,
+    phone,
+    t("drafting.paymentPrompt"),
+    t("fulfillment.payNowButton", { amount: String(amount) }),
+    shortUrl
+  );
+}
+
+/**
+ * Post-payment: generate content, upload, and deliver.
+ * Called from Razorpay webhook after payment is confirmed.
+ */
+export async function generateAndDeliver(phone: string, conversation: Conversation): Promise<void> {
   const cid = conversation.conversationId;
   const outputType = conversation.structuredData.outputType!;
   const enrichedPrompt = String(conversation.unstructuredData._enrichedPrompt ?? "");
 
   await db.collection("conversations").doc(cid).update({
     status: "generating",
+    processing: true,
     updatedAt: new Date(),
   });
 
   try {
     let cleanUrl: string;
-    let previewUrl: string;
 
     if (outputType === "image") {
-      // Generate once — upload clean original + a watermarked/low-res preview
       const buffer = await generateImage({ structuredData: conversation.structuredData, enrichedPrompt });
       cleanUrl = await uploadFile(buffer, "image/png", "images");
-      const previewBuffer = await preparePreview(buffer);
-      previewUrl = await uploadFile(previewBuffer, "image/png", "previews");
     } else if (outputType === "video") {
-      // Video watermarking not yet implemented — clean and preview are the same
       cleanUrl = await generateVideo({ structuredData: conversation.structuredData, enrichedPrompt, unstructuredData: conversation.unstructuredData });
-      previewUrl = cleanUrl;
     } else {
-      // Audio watermarking not applicable — clean and preview are the same
       cleanUrl = await generateAudio({ structuredData: conversation.structuredData, enrichedPrompt });
-      previewUrl = cleanUrl;
     }
 
-    // Persist both URLs — post-payment delivery reads cleanUrl directly, no re-generation
-    await db.collection("conversations").doc(cid).update({ cleanUrl, previewUrl });
-
-    // Create payment link before deciding whether to show preview
-    const amount = PRICES[outputType];
-    const { id: linkId, shortUrl } = await createPaymentLink(
-      phone,
-      cid,
-      amount,
-      t("fulfillment.paymentDescription", { outputType })
-    );
-
     await db.collection("conversations").doc(cid).update({
-      status: "awaiting_payment",
-      paymentData: { linkId, amount, currency: "INR", createdAt: new Date() },
+      cleanUrl,
+      status: "delivering",
       updatedAt: new Date(),
     });
 
-    const previewAllowed = await checkPreviewAllowed(phone);
-
-    if (previewAllowed) {
-      await sendText(cid, phone, t("fulfillment.previewLabel"));
-      await dispatchOutput(cid, phone, outputType, previewUrl);
-      await incrementPreviewCount(phone);
-
-      await sendCTAButton(
-        cid,
-        phone,
-        t("fulfillment.paymentPrompt"),
-        t("fulfillment.payNowButton", { amount: String(amount) }),
-        shortUrl
-      );
-
-      // Offer refinement if the user still has refinements left
-      const refinementCount = conversation.refinementCount ?? 0;
-      if (refinementCount < PREVIEW_POLICY.maxRefinementsPerConversation) {
-        await sendButtons(cid, phone, t("fulfillment.refinePrompt"), [
-          { id: "refine_brief", title: t("fulfillment.refineButton") },
-        ]);
-      }
-    } else {
-      // Cap hit — content is generated and stored; user must pay to receive it
-      await sendCTAButton(
-        cid,
-        phone,
-        t("fulfillment.capHitMessage"),
-        t("fulfillment.payNowButton", { amount: String(amount) }),
-        shortUrl
-      );
-    }
+    await dispatchOutput(cid, phone, outputType, cleanUrl);
   } catch (err) {
-    logger.error("Fulfillment failed", { err });
+    logger.error("Generation failed after payment", { err, cid });
     await sendText(cid, phone, t("errors.outputFailed"));
     await db.collection("conversations").doc(cid).update({
-      status: "briefing",
+      status: "drafting",
       updatedAt: new Date(),
     });
+  } finally {
+    await db.collection("conversations").doc(cid).update({
+      processing: false,
+      updatedAt: new Date(),
+    }).catch(() => undefined);
   }
 }
 

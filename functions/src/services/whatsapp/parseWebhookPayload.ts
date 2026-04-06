@@ -43,7 +43,7 @@ export function parseWebhookPayload(payload: unknown): ParsedMessage | null {
       return { ...base, type: "text", text: message.text?.body };
 
     case "image":
-      return { ...base, type: "image", mediaId: message.image?.id };
+      return { ...base, type: "image", mediaId: message.image?.id, text: message.image?.caption };
 
     case "video":
       return { ...base, type: "video", mediaId: message.video?.id };
