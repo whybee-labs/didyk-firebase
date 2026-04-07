@@ -35,7 +35,7 @@ export async function handleDrafting(
     return;
   }
 
-  // Image sent directly → auto-attach as reference + re-run Creative Director
+  // Image sent directly → auto-attach as reference
   if (message.type === "image" && message.mediaId) {
     await setProcessing(cid, true);
     try {
@@ -52,8 +52,29 @@ export async function handleDrafting(
         structuredData: { ...conversation.structuredData, referenceImageUrls: updated },
       };
 
-      const result = await callCreativeDirector(buildDirectorInput(conversation, message.text ?? ""));
-      await handleDirectorResult(cid, phone, conversation, result, t("drafting.imageAttached"));
+      const caption = message.text?.trim();
+      if (caption) {
+        // Image with caption → re-run Creative Director with caption as context
+        const result = await callCreativeDirector(buildDirectorInput(conversation, caption));
+        await handleDirectorResult(cid, phone, conversation, result, t("drafting.imageAttached"));
+      } else {
+        // Image without caption → just acknowledge and re-show current state
+        const ud = conversation.unstructuredData;
+        if (ud._enrichedPrompt) {
+          await sendText(cid, phone, t("drafting.imageAttached"));
+          await sendDraftSummary(cid, phone, {
+            title: String(ud._title ?? ""),
+            enrichedPrompt: String(ud._enrichedPrompt),
+            style: String(ud._style ?? ""),
+            mood: String(ud._mood ?? ""),
+            aspectRatio: String(ud._aspectRatio ?? "1:1"),
+          }, updated.length);
+        } else {
+          // No draft yet — just acknowledge the image
+          await sendText(cid, phone, t("uploading.imageReceived", { count: String(updated.length) }));
+          await sendText(cid, phone, t("intake.describePrompt"));
+        }
+      }
     } catch (err) {
       logger.error("Drafting image handling failed", { err, cid });
       await sendText(cid, phone, t("errors.generic")).catch(() => undefined);

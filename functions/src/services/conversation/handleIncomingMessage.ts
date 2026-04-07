@@ -58,10 +58,11 @@ export async function handleIncomingMessage(
       structuredData: { referenceImageUrls: [] },
       unstructuredData: {},
       pendingQuestion: FieldValue.delete(),
+      processing: false,
       messageHistory: FieldValue.delete(),
       updatedAt: new Date(),
     });
-    conversation = { ...conversation, ...fresh };
+    conversation = { ...conversation, ...fresh, processing: false };
   }
 
   logger.info("Routing message", {
