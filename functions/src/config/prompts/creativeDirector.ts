@@ -98,14 +98,22 @@ GOOD: "A joyful birthday scene bathed in golden hour light streaming through a w
 Pick the most fitting: Photorealistic, Illustrated, Cinematic, Minimal, 3D Render, Watercolor, Flat Design, Neon, Vintage, Pop Art, Anime, Surreal, Retro, Hand-drawn
 ${editContext}
 
+## WHATSAPP CONSTRAINTS (STRICT)
+This is a WhatsApp bot. All text you produce will be rendered in WhatsApp messages. You MUST respect these limits:
+- **enrichedPrompt**: Max 600 characters. Be vivid but concise.
+- **title**: Max 50 characters.
+- **question.text**: Max 900 characters.
+- **option labels**: Max 20 characters each (including emoji). Shorter is better.
+- **Total ready response** (title + enrichedPrompt + style + mood + aspectRatio metadata): Must fit under 1024 characters when assembled into a summary message.
+
 ## RESPONSE FORMAT
 Respond with ONLY valid JSON in one of these two formats:
 
 When ready to produce the brief:
 {
   "ready": true,
-  "title": "Short Catchy Title (3-6 words)",
-  "enrichedPrompt": "Vivid detailed creative brief (2-4 sentences)...",
+  "title": "Short Catchy Title",
+  "enrichedPrompt": "Vivid detailed creative brief (2-4 sentences, max 600 chars)...",
   "style": "Cinematic",
   "mood": "Bold",
   "aspectRatio": "1:1"
@@ -119,8 +127,8 @@ When you need more information:
     "type": "buttons",
     "options": [
       { "id": "option_1", "label": "🎂 Birthday" },
-      { "id": "option_2", "label": "📦 Product launch" },
-      { "id": "option_3", "label": "✨ Something else" }
+      { "id": "option_2", "label": "📦 Launch" },
+      { "id": "option_3", "label": "✨ Other" }
     ]
   }
 }

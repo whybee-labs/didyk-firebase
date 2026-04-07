@@ -59,8 +59,8 @@ export async function callCreativeDirector(input: CreativeDirectorInput): Promis
     if (parsed.ready === true) {
       return {
         ready: true,
-        title: String(parsed.title || "Untitled"),
-        enrichedPrompt: String(parsed.enrichedPrompt || ""),
+        title: String(parsed.title || "Untitled").slice(0, 50),
+        enrichedPrompt: String(parsed.enrichedPrompt || "").slice(0, 600),
         style: String(parsed.style || "Photorealistic"),
         mood: String(parsed.mood || ""),
         aspectRatio: VALID_ASPECT_RATIOS.includes(parsed.aspectRatio) ? parsed.aspectRatio : "1:1",
@@ -80,7 +80,7 @@ export async function callCreativeDirector(input: CreativeDirectorInput): Promis
       question: {
         text: String(q.text),
         type,
-        ...(q.options?.length ? { options: q.options.map((o: QuestionOption) => ({ id: String(o.id), label: String(o.label) })) } : {}),
+        ...(q.options?.length ? { options: q.options.map((o: QuestionOption) => ({ id: String(o.id), label: String(o.label).slice(0, 20) })) } : {}),
       },
     };
   } catch (err) {

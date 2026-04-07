@@ -54,6 +54,9 @@ export async function handleDrafting(
 
       const result = await callCreativeDirector(buildDirectorInput(conversation, message.text ?? ""));
       await handleDirectorResult(cid, phone, conversation, result, t("drafting.imageAttached"));
+    } catch (err) {
+      logger.error("Drafting image handling failed", { err, cid });
+      await sendText(cid, phone, t("errors.generic")).catch(() => undefined);
     } finally {
       await setProcessing(cid, false);
     }
@@ -76,6 +79,9 @@ export async function handleDrafting(
       const result = await callCreativeDirector(buildDirectorInput(conversation, userText));
       const prefix = conversation.unstructuredData._enrichedPrompt ? t("drafting.editApplied") : undefined;
       await handleDirectorResult(cid, phone, conversation, result, prefix);
+    } catch (err) {
+      logger.error("Drafting text handling failed", { err, cid });
+      await sendText(cid, phone, t("errors.generic")).catch(() => undefined);
     } finally {
       await setProcessing(cid, false);
     }
@@ -103,7 +109,6 @@ function extractUserText(message: ParsedMessage, conversation: Conversation): st
     return message.text.trim();
   }
   if (message.type === "button_reply" && message.buttonId) {
-    // Return the button title or ID as user text for Creative Director context
     return message.text ?? message.buttonId;
   }
   if (message.type === "list_reply" && message.listId) {
@@ -166,6 +171,11 @@ async function persistDraft(
   });
 }
 
+/**
+ * WhatsApp interactive button messages have a 1024-char body limit.
+ * If the summary exceeds that, send the brief as plain text first,
+ * then send the action buttons separately.
+ */
 export async function sendDraftSummary(
   cid: string,
   phone: string,
@@ -173,12 +183,23 @@ export async function sendDraftSummary(
   referenceCount: number
 ): Promise<void> {
   const refLine = referenceCount > 0 ? `\n📎 ${referenceCount} reference image(s)` : "";
-  const summary = `✨ *${draft.title}*\n\n${draft.enrichedPrompt}\n\n📐 ${draft.aspectRatio} • 🎨 ${draft.style} • ${draft.mood}${refLine}\n\nTap *Create now* to generate, or just tell me what to change.`;
+  const briefText = `✨ *${draft.title}*\n\n${draft.enrichedPrompt}\n\n📐 ${draft.aspectRatio} • 🎨 ${draft.style} • ${draft.mood}${refLine}`;
+  const ctaLine = "\n\nTap *Create now* to generate, or just tell me what to change.";
 
-  await sendButtons(cid, phone, summary, [
+  const buttons = [
     { id: "create_now", title: t("drafting.createButton") },
     { id: "add_photos", title: t("drafting.addPhotosButton") },
-  ]);
+  ];
+
+  const fullSummary = briefText + ctaLine;
+
+  if (fullSummary.length <= 1024) {
+    await sendButtons(cid, phone, fullSummary, buttons);
+  } else {
+    // Split: send the creative brief as text, then buttons with short CTA
+    await sendText(cid, phone, briefText);
+    await sendButtons(cid, phone, "What would you like to do?", buttons);
+  }
 }
 
 async function dispatchQuestion(
