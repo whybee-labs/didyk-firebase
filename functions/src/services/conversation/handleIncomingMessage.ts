@@ -115,62 +115,77 @@ export async function handleIncomingMessage(
     conversation = { ...conversation, processing: false };
   }
 
-  switch (conversation.status) {
-    case "intake":
-      await handleIntake(phone, message, conversation);
-      break;
+  try {
+    switch (conversation.status) {
+      case "intake":
+        await handleIntake(phone, message, conversation);
+        break;
 
-    case "uploading":
-      await handleUploading(phone, message, conversation);
-      break;
+      case "uploading":
+        await handleUploading(phone, message, conversation);
+        break;
 
-    case "drafting":
-      await handleDrafting(phone, message, conversation);
-      break;
+      case "drafting":
+        await handleDrafting(phone, message, conversation);
+        break;
 
-    case "briefing":
-      await handleBriefing(phone, message, conversation);
-      break;
+      case "briefing":
+        await handleBriefing(phone, message, conversation);
+        break;
 
-    case "planning":
-      await handlePlanning(phone, message, conversation);
-      break;
+      case "planning":
+        await handlePlanning(phone, message, conversation);
+        break;
 
-    case "confirming":
-      await handleConfirmation(phone, message, conversation);
-      break;
+      case "confirming":
+        await handleConfirmation(phone, message, conversation);
+        break;
 
-    case "generating":
-      await sendText(conversation.conversationId, phone, t("status.generating"));
-      break;
+      case "generating":
+        await sendText(conversation.conversationId, phone, t("status.generating"));
+        break;
 
-    case "awaiting_payment":
-      if (message.type === "button_reply" && message.buttonId === "refine_brief") {
-        const refinementCount = conversation.refinementCount ?? 0;
-        if (refinementCount < PREVIEW_POLICY.maxRefinementsPerConversation) {
-          await db.collection("conversations").doc(conversation.conversationId).update({
-            status: "drafting",
-            refinementCount: refinementCount + 1,
-            pendingQuestion: FieldValue.delete(),
-            updatedAt: new Date(),
-          });
-          conversation = { ...conversation, status: "drafting", refinementCount: refinementCount + 1, pendingQuestion: undefined };
-          await handleDrafting(phone, message, conversation);
+      case "awaiting_payment":
+        if (message.type === "button_reply" && message.buttonId === "refine_brief") {
+          const refinementCount = conversation.refinementCount ?? 0;
+          if (refinementCount < PREVIEW_POLICY.maxRefinementsPerConversation) {
+            await db.collection("conversations").doc(conversation.conversationId).update({
+              status: "drafting",
+              refinementCount: refinementCount + 1,
+              pendingQuestion: FieldValue.delete(),
+              updatedAt: new Date(),
+            });
+            conversation = { ...conversation, status: "drafting", refinementCount: refinementCount + 1, pendingQuestion: undefined };
+            await handleDrafting(phone, message, conversation);
+          } else {
+            await sendText(conversation.conversationId, phone, t("fulfillment.refinementsExhausted"));
+          }
         } else {
-          await sendText(conversation.conversationId, phone, t("fulfillment.refinementsExhausted"));
+          await sendText(conversation.conversationId, phone, t("status.awaitingPayment"));
         }
-      } else {
-        await sendText(conversation.conversationId, phone, t("status.awaitingPayment"));
-      }
-      break;
+        break;
 
-    case "feedback":
-      await handleFeedback(phone, message, conversation);
-      break;
+      case "feedback":
+        await handleFeedback(phone, message, conversation);
+        break;
 
-    default:
-      // Unknown/completed state — restart
-      await handleIntake(phone, message, conversation);
+      default:
+        // Unknown/completed state — restart
+        await handleIntake(phone, message, conversation);
+    }
+  } catch (err) {
+    logger.error("Unhandled error in state handler", {
+      err: (err as Error)?.message ?? String(err),
+      stack: (err as Error)?.stack,
+      status: conversation.status,
+      conversationId: conversation.conversationId,
+    });
+    // Always clear processing flag on unhandled error so the user isn't stuck
+    await db.collection("conversations").doc(conversation.conversationId).update({
+      processing: false,
+      updatedAt: new Date(),
+    }).catch(() => undefined);
+    await sendText(conversation.conversationId, phone, t("errors.generic")).catch(() => undefined);
   }
 }
 

@@ -37,10 +37,14 @@ export async function handleDrafting(
 
   // Image sent directly → auto-attach as reference
   if (message.type === "image" && message.mediaId) {
+    logger.info("Drafting: image received", { cid, mediaId: message.mediaId });
     await setProcessing(cid, true);
     try {
+      logger.info("Drafting: downloading WhatsApp media", { cid });
       const { buffer, mimeType } = await downloadWhatsAppMedia(message.mediaId);
+      logger.info("Drafting: media downloaded, uploading to storage", { cid, size: buffer.length, mimeType });
       const url = await uploadFile(buffer, mimeType ?? "image/jpeg", "reference-images");
+      logger.info("Drafting: file uploaded", { cid, url });
       const current = conversation.structuredData.referenceImageUrls ?? [];
       const updated = [...current, url].slice(0, 5);
       await db.collection("conversations").doc(cid).update({
@@ -54,11 +58,11 @@ export async function handleDrafting(
 
       const caption = message.text?.trim();
       if (caption) {
-        // Image with caption → re-run Creative Director with caption as context
+        logger.info("Drafting: image with caption, calling Creative Director", { cid });
         const result = await callCreativeDirector(buildDirectorInput(conversation, caption));
         await handleDirectorResult(cid, phone, conversation, result, t("drafting.imageAttached"));
       } else {
-        // Image without caption → just acknowledge and re-show current state
+        logger.info("Drafting: image without caption, acknowledging", { cid });
         const ud = conversation.unstructuredData;
         if (ud._enrichedPrompt) {
           await sendText(cid, phone, t("drafting.imageAttached"));
@@ -70,13 +74,13 @@ export async function handleDrafting(
             aspectRatio: String(ud._aspectRatio ?? "1:1"),
           }, updated.length);
         } else {
-          // No draft yet — just acknowledge the image
           await sendText(cid, phone, t("uploading.imageReceived", { count: String(updated.length) }));
           await sendText(cid, phone, t("intake.describePrompt"));
         }
       }
+      logger.info("Drafting: image handling complete", { cid });
     } catch (err) {
-      logger.error("Drafting image handling failed", { err, cid });
+      logger.error("Drafting image handling failed", { err: (err as Error)?.message ?? String(err), stack: (err as Error)?.stack, cid });
       await sendText(cid, phone, t("errors.generic")).catch(() => undefined);
     } finally {
       await setProcessing(cid, false);
@@ -87,9 +91,9 @@ export async function handleDrafting(
   // Text / button reply / list reply → map pending question + re-run Creative Director
   const userText = extractUserText(message, conversation);
   if (userText !== null) {
+    logger.info("Drafting: text/reply received", { cid, userText: userText.slice(0, 100) });
     await setProcessing(cid, true);
     try {
-      // Clear pending question if we just answered one
       if (conversation.pendingQuestion) {
         await db.collection("conversations").doc(cid).update({
           pendingQuestion: null,
@@ -97,11 +101,14 @@ export async function handleDrafting(
         });
       }
 
+      logger.info("Drafting: calling Creative Director", { cid });
       const result = await callCreativeDirector(buildDirectorInput(conversation, userText));
+      logger.info("Drafting: CD returned", { cid, ready: result.ready });
       const prefix = conversation.unstructuredData._enrichedPrompt ? t("drafting.editApplied") : undefined;
       await handleDirectorResult(cid, phone, conversation, result, prefix);
+      logger.info("Drafting: text handling complete", { cid });
     } catch (err) {
-      logger.error("Drafting text handling failed", { err, cid });
+      logger.error("Drafting text handling failed", { err: (err as Error)?.message ?? String(err), stack: (err as Error)?.stack, cid });
       await sendText(cid, phone, t("errors.generic")).catch(() => undefined);
     } finally {
       await setProcessing(cid, false);
