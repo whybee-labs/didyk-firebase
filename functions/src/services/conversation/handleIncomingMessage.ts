@@ -98,10 +98,21 @@ export async function handleIncomingMessage(
     }
   }
 
-  // Processing lock — if an async operation is in progress, ask user to wait
+  // Processing lock — if an async operation is in progress, ask user to wait.
+  // Stale check: if processing has been true for >30s, treat it as stuck and clear it.
   if (conversation.processing) {
-    await sendText(conversation.conversationId, phone, t("status.processing"));
-    return;
+    const secondsSinceUpdate = (Date.now() - conversation.updatedAt.getTime()) / 1000;
+    if (secondsSinceUpdate < 30) {
+      await sendText(conversation.conversationId, phone, t("status.processing"));
+      return;
+    }
+    // Stale processing flag — clear it and proceed
+    logger.warn("Clearing stale processing flag", { conversationId: conversation.conversationId, secondsSinceUpdate });
+    await db.collection("conversations").doc(conversation.conversationId).update({
+      processing: false,
+      updatedAt: new Date(),
+    });
+    conversation = { ...conversation, processing: false };
   }
 
   switch (conversation.status) {
