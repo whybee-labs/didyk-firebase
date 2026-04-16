@@ -31,26 +31,39 @@ export async function createOrderAndRequestPayment(phone: string, conversation: 
 
   logger.info("Creating payment order", { phone, cid, outputType, amount });
 
-  const { id: linkId, shortUrl } = await createPaymentLink(
-    phone,
-    cid,
-    amount,
-    t("fulfillment.paymentDescription", { outputType })
-  );
+  try {
+    const { id: linkId, shortUrl } = await createPaymentLink(
+      phone,
+      cid,
+      amount,
+      t("fulfillment.paymentDescription", { outputType })
+    );
+    logger.info("Payment link created", { cid, linkId, shortUrl });
 
-  await db.collection("conversations").doc(cid).update({
-    status: "awaiting_payment",
-    paymentData: { linkId, amount, currency: "INR", createdAt: new Date() },
-    updatedAt: new Date(),
-  });
+    await db.collection("conversations").doc(cid).update({
+      status: "awaiting_payment",
+      paymentData: { linkId, amount, currency: "INR", createdAt: new Date() },
+      updatedAt: new Date(),
+    });
 
-  await sendCTAButton(
-    cid,
-    phone,
-    t("drafting.paymentPrompt"),
-    t("fulfillment.payNowButton", { amount: String(amount) }),
-    shortUrl
-  );
+    await sendCTAButton(
+      cid,
+      phone,
+      t("drafting.paymentPrompt"),
+      t("fulfillment.payNowButton", { amount: String(amount) }),
+      shortUrl
+    );
+    logger.info("Payment CTA sent", { cid });
+  } catch (err) {
+    logger.error("createOrderAndRequestPayment failed", {
+      err: (err as Error)?.message ?? String(err),
+      stack: (err as Error)?.stack,
+      cid,
+      outputType,
+      amount,
+    });
+    throw err; // re-throw so global handler sends error message to user
+  }
 }
 
 /**
